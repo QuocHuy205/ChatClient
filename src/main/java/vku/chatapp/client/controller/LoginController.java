@@ -1,3 +1,6 @@
+// FILE: vku/chatapp/client/controller/LoginController.java
+// ✅ FIX: Thêm cập nhật status ONLINE sau khi login
+
 package vku.chatapp.client.controller;
 
 import javafx.fxml.FXML;
@@ -6,9 +9,11 @@ import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import javafx.event.ActionEvent;
 import vku.chatapp.common.dto.AuthResponse;
+import vku.chatapp.common.enums.UserStatus;
 import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.rmi.ServiceLocator;
 import vku.chatapp.client.service.AuthService;
+import vku.chatapp.client.rmi.RMIClient;
 
 public class LoginController extends BaseController {
     @FXML private TextField usernameField;
@@ -55,6 +60,21 @@ public class LoginController extends BaseController {
                     UserSession.getInstance().setCurrentUser(response.getUser());
                     UserSession.getInstance().setSessionToken(response.getSessionToken());
 
+                    // ✅ FIX 1: CẬP NHẬT STATUS THÀNH ONLINE
+                    try {
+                        boolean statusUpdated = RMIClient.getInstance()
+                                .getUserService()
+                                .updateStatus(response.getUser().getId(), UserStatus.ONLINE);
+
+                        if (statusUpdated) {
+                            System.out.println("✅ User status updated to ONLINE");
+                        } else {
+                            System.err.println("⚠️ Failed to update user status");
+                        }
+                    } catch (Exception e) {
+                        System.err.println("❌ Error updating status: " + e.getMessage());
+                    }
+
                     // Get stage from current scene
                     if (stage == null) {
                         stage = (Stage) usernameField.getScene().getWindow();
@@ -69,7 +89,6 @@ public class LoginController extends BaseController {
 
     @FXML
     private void handleRegister(ActionEvent event) {
-        // Get stage if not set
         if (stage == null) {
             stage = getStageFromEvent(event);
         }
@@ -78,12 +97,10 @@ public class LoginController extends BaseController {
 
     @FXML
     private void handleForgotPassword(ActionEvent event) {
-        // Get stage if not set
         if (stage == null) {
             stage = getStageFromEvent(event);
         }
 
-        // Show forgot password dialog
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Forgot Password");
         dialog.setHeaderText("Reset Password");
@@ -95,7 +112,6 @@ public class LoginController extends BaseController {
                 return;
             }
 
-            // Send OTP
             new Thread(() -> {
                 boolean success = authService.sendPasswordResetOtp(email);
 
@@ -115,7 +131,6 @@ public class LoginController extends BaseController {
         dialog.setTitle("Reset Password");
         dialog.setHeaderText("Enter reset code and new password");
 
-        // Create form
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
@@ -161,7 +176,6 @@ public class LoginController extends BaseController {
                     return;
                 }
 
-                // Reset password
                 new Thread(() -> {
                     boolean success = authService.resetPassword(email, otp, newPassword);
 

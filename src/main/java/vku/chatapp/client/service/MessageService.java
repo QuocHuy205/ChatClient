@@ -1,3 +1,6 @@
+// FILE: vku/chatapp/client/service/MessageService.java
+// ✅ FIX: Thêm senderId vào P2PMessage
+
 package vku.chatapp.client.service;
 
 import vku.chatapp.common.dto.PeerInfo;
@@ -6,6 +9,7 @@ import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 import vku.chatapp.client.p2p.P2PClient;
 import vku.chatapp.client.p2p.PeerRegistry;
+import vku.chatapp.client.model.UserSession;
 
 import java.util.UUID;
 
@@ -21,14 +25,21 @@ public class MessageService {
     public boolean sendTextMessage(Long receiverId, String content) {
         PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
         if (peerInfo == null) {
-            System.err.println("Peer not found: " + receiverId);
+            System.err.println("❌ Peer not found: " + receiverId);
+            System.err.println("Available peers: " + peerRegistry);
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.TEXT_MESSAGE, null, receiverId);
+        // ✅ FIX 7: THÊM SENDER_ID VÀO MESSAGE
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.TEXT_MESSAGE, senderId, receiverId);
         message.setMessageId(UUID.randomUUID().toString());
         message.setContent(content);
         message.setContentType(MessageType.TEXT);
+
+        System.out.println("📤 Sending message from " + senderId + " to " + receiverId);
+        System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
 
         return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
@@ -43,7 +54,10 @@ public class MessageService {
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.FILE_TRANSFER, null, receiverId);
+        // ✅ FIX: THÊM SENDER_ID
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.FILE_TRANSFER, senderId, receiverId);
         message.setMessageId(UUID.randomUUID().toString());
         message.setFileName(fileName);
         message.setFileData(fileData);
@@ -58,7 +72,10 @@ public class MessageService {
             return;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.TYPING_INDICATOR, null, receiverId);
+        // ✅ FIX: THÊM SENDER_ID
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.TYPING_INDICATOR, senderId, receiverId);
         message.setContent(String.valueOf(isTyping));
 
         p2pClient.sendMessageAsync(peerInfo.getAddress(), peerInfo.getPort(), message);
@@ -70,7 +87,10 @@ public class MessageService {
             return;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.READ_RECEIPT, null, receiverId);
+        // ✅ FIX: THÊM SENDER_ID
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.READ_RECEIPT, senderId, receiverId);
         message.setMessageId(messageId);
 
         p2pClient.sendMessageAsync(peerInfo.getAddress(), peerInfo.getPort(), message);
