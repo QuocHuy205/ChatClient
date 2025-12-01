@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="vku.chatapp.client.controller.MainController"
+            styleClass="main-window">
+
+    <!-- Left Sidebar -->
+    <left>
+        <VBox styleClass="sidebar" prefWidth="300" spacing="0">
+
+            <!-- User Profile Section -->
+            <HBox styleClass="user-profile-section" alignment="CENTER_LEFT" spacing="12">
+                <padding>
+                    <Insets top="15" right="15" bottom="15" left="15"/>
+                </padding>
+
+                <Region styleClass="avatar-circle" prefWidth="45" prefHeight="45"/>
+
+                <VBox spacing="2" HBox.hgrow="ALWAYS">
+                    <Label fx:id="usernameLabel" text="User Name" styleClass="username-label">
+                        <font>
+                            <Font name="Segoe UI Semibold" size="14"/>
+                        </font>
+                    </Label>
+                    <Label fx:id="statusLabel" text="Online" styleClass="status-label">
+                        <font>
+                            <Font size="12"/>
+                        </font>
+                    </Label>
+                </VBox>
+
+                <Button text="⚙" styleClass="icon-button" onAction="#handleSettings">
+                    <tooltip>
+                        <Tooltip text="Settings"/>
+                    </tooltip>
+                </Button>
+            </HBox>
+
+            <Separator/>
+
+            <!-- Friend Search & Add Section -->
+            <VBox spacing="5" styleClass="search-section">
+                <padding>
+                    <Insets top="10" right="10" bottom="10" left="10"/>
+                </padding>
+
+                <!-- Search Box -->
+                <HBox spacing="5" alignment="CENTER_LEFT">
+                    <TextField fx:id="searchFriendField"
+                               promptText="Search username to add..."
+                               styleClass="search-field"
+                               onAction="#handleSearchUser"
+                               HBox.hgrow="ALWAYS"/>
+                    <Button text="🔍" styleClass="icon-button-large"
+                            onAction="#handleSearchUser">
+                        <tooltip>
+                            <Tooltip text="Search User"/>
+                        </tooltip>
+                    </Button>
+                </HBox>
+
+                <!-- Search Result (hidden by default) -->
+                <VBox fx:id="searchResultBox" spacing="5" managed="false" visible="false"
+                      styleClass="search-result-box">
+                    <padding>
+                        <Insets top="5" right="5" bottom="5" left="5"/>
+                    </padding>
+
+                    <HBox spacing="10" alignment="CENTER_LEFT">
+                        <Region styleClass="avatar-circle" prefWidth="30" prefHeight="30"/>
+                        <VBox spacing="2" HBox.hgrow="ALWAYS">
+                            <Label fx:id="searchResultName" text="" styleClass="search-result-name"/>
+                            <Label fx:id="searchResultUsername" text="" styleClass="search-result-username"/>
+                        </VBox>
+                        <Button fx:id="addFriendButton" text="+ Add"
+                                styleClass="primary-button-small"
+                                onAction="#handleAddFriendFromSearch"/>
+                    </HBox>
+                </VBox>
+            </VBox>
+
+            <Separator/>
+
+            <!-- Tabs for Friends and Chats -->
+            <TabPane styleClass="sidebar-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+
+                <!-- Friends Tab -->
+                <Tab text="Friends">
+                    <VBox spacing="0" VBox.vgrow="ALWAYS">
+                        <!-- Friend Filter -->
+                        <HBox spacing="5" alignment="CENTER_LEFT" styleClass="filter-box">
+                            <padding>
+                                <Insets top="5" right="10" bottom="5" left="10"/>
+                            </padding>
+                            <TextField fx:id="filterFriendField"
+                                       promptText="Filter friends..."
+                                       styleClass="filter-field"
+                                       HBox.hgrow="ALWAYS"/>
+                        </HBox>
+
+                        <!-- Friends ListView -->
+                        <ListView fx:id="friendListView" styleClass="friend-list" VBox.vgrow="ALWAYS">
+                            <placeholder>
+                                <VBox alignment="CENTER" spacing="10">
+                                    <padding>
+                                        <Insets top="30"/>
+                                    </padding>
+                                    <Label text="👥" style="-fx-font-size: 32px;"/>
+                                    <Label text="No friends yet" styleClass="placeholder-label"/>
+                                    <Label text="Search username above to add friends"
+                                           style="-fx-font-size: 11px; -fx-text-fill: #605e5c;"/>
+                                </VBox>
+                            </placeholder>
+                        </ListView>
+                    </VBox>
+                </Tab>
+
+                <!-- Chats Tab -->
+                <Tab text="Chats">
+                    <ListView fx:id="chatListView" styleClass="chat-list">
+                        <placeholder>
+                            <VBox alignment="CENTER" spacing="10">
+                                <padding>
+                                    <Insets top="30"/>
+                                </padding>
+                                <Label text="💬" style="-fx-font-size: 32px;"/>
+                                <Label text="No conversations yet" styleClass="placeholder-label"/>
+                                <Label text="Select a friend to start chatting"
+                                       style="-fx-font-size: 11px; -fx-text-fill: #605e5c;"/>
+                            </VBox>
+                        </placeholder>
+                    </ListView>
+                </Tab>
+
+            </TabPane>
+
+        </VBox>
+    </left>
+
+    <!-- Main Chat Area -->
+    <center>
+        <VBox fx:id="chatAreaContainer" styleClass="chat-area" VBox.vgrow="ALWAYS">
+            <!-- Welcome Screen (replaced by chat when friend selected) -->
+            <StackPane VBox.vgrow="ALWAYS">
+                <VBox alignment="CENTER" spacing="15">
+                    <Label text="💬" style="-fx-font-size: 64px;"/>
+                    <Label text="VKU Chat" styleClass="welcome-title">
+                        <font>
+                            <Font name="Segoe UI Semibold" size="24"/>
+                        </font>
+                    </Label>
+                    <Label text="Select a friend to start chatting"
+                           styleClass="welcome-subtitle">
+                        <font>
+                            <Font size="14"/>
+                        </font>
+                    </Label>
+                    <HBox spacing="10" alignment="CENTER">
+                        <Button text="📞 Voice Call" styleClass="welcome-button" disable="true"/>
+                        <Button text="📹 Video Call" styleClass="welcome-button" disable="true"/>
+                    </HBox>
+                </VBox>
+            </StackPane>
+        </VBox>
+    </center>
+
+</BorderPane>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.*?>
+
+<VBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="vku.chatapp.client.controller.VideoCallController"
+      styleClass="call-window" spacing="0">
+
+    <!-- Main Call Container -->
+    <StackPane fx:id="callContainer" VBox.vgrow="ALWAYS" styleClass="call-container">
+
+        <!-- Remote Video (Full Screen) -->
+        <ImageView fx:id="remoteVideoView"
+                   preserveRatio="false"
+                   fitWidth="800"
+                   fitHeight="600"
+                   styleClass="remote-video"/>
+
+        <!-- Local Video (Picture-in-Picture) -->
+        <StackPane alignment="TOP_RIGHT" StackPane.alignment="TOP_RIGHT">
+            <padding>
+                <Insets top="20" right="20"/>
+            </padding>
+
+            <VBox styleClass="local-video-container" spacing="0">
+                <ImageView fx:id="localVideoView"
+                           preserveRatio="true"
+                           fitWidth="240"
+                           fitHeight="180"
+                           styleClass="local-video"/>
+            </VBox>
+        </StackPane>
+
+        <!-- Call Info Overlay (Top Center) -->
+        <VBox alignment="TOP_CENTER" StackPane.alignment="TOP_CENTER">
+            <padding>
+                <Insets top="20"/>
+            </padding>
+
+            <VBox alignment="CENTER" spacing="5" styleClass="call-info-overlay">
+                <padding>
+                    <Insets top="15" right="20" bottom="15" left="20"/>
+                </padding>
+
+                <Label fx:id="peerNameLabel" text="Friend Name" styleClass="peer-name-label">
+                    <font>
+                        <Font name="Segoe UI Semibold" size="18"/>
+                    </font>
+                </Label>
+
+                <Label fx:id="callStatusLabel" text="Connecting..." styleClass="call-status-label">
+                    <font>
+                        <Font size="14"/>
+                    </font>
+                </Label>
+
+                <Label fx:id="callDurationLabel" text="00:00" styleClass="call-duration-label">
+                    <font>
+                        <Font size="16" name="Segoe UI Semibold"/>
+                    </font>
+                </Label>
+            </VBox>
+        </VBox>
+
+        <!-- Call Controls (Bottom Center) -->
+        <HBox alignment="BOTTOM_CENTER" StackPane.alignment="BOTTOM_CENTER">
+            <padding>
+                <Insets bottom="40"/>
+            </padding>
+
+            <HBox spacing="15" alignment="CENTER" styleClass="call-controls">
+                <padding>
+                    <Insets top="15" right="20" bottom="15" left="20"/>
+                </padding>
+
+                <!-- Mute Button -->
+                <Button fx:id="muteButton"
+                        text="🔊"
+                        onAction="#handleMute"
+                        styleClass="call-control-button">
+                    <font>
+                        <Font size="24"/>
+                    </font>
+                </Button>
+
+                <!-- Video Toggle Button -->
+                <Button fx:id="videoToggleButton"
+                        text="📹"
+                        onAction="#handleVideoToggle"
+                        styleClass="call-control-button">
+                    <font>
+                        <Font size="24"/>
+                    </font>
+                </Button>
+
+                <!-- End Call Button -->
+                <Button fx:id="endCallButton"
+                        text="📞"
+                        onAction="#handleEndCall"
+                        styleClass="call-control-button call-end-button">
+                    <font>
+                        <Font size="24"/>
+                    </font>
+                </Button>
+
+                <!-- Switch Camera Button -->
+                <Button fx:id="switchCameraButton"
+                        text="🔄"
+                        onAction="#handleSwitchCamera"
+                        styleClass="call-control-button">
+                    <font>
+                        <Font size="22"/>
+                    </font>
+                </Button>
+
+            </HBox>
+        </HBox>
+
+    </StackPane>
+
+</VBox>

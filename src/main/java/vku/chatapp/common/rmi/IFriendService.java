@@ -1,0 +1,17 @@
+package vku.chatapp.common.rmi;
+
+import vku.chatapp.common.dto.UserDTO;
+import vku.chatapp.common.model.Friend;
+
+import java.rmi.Remote;
+import java.rmi.RemoteException;
+import java.util.List;
+
+public interface IFriendService extends Remote {
+    boolean sendFriendRequest(Long userId, Long friendId) throws RemoteException;
+    boolean acceptFriendRequest(Long requestId) throws RemoteException;
+    boolean rejectFriendRequest(Long requestId) throws RemoteException;
+    boolean removeFriend(Long userId, Long friendId) throws RemoteException;
+    List<UserDTO> getFriendList(Long userId) throws RemoteException;
+    List<Friend> getPendingRequests(Long userId) throws RemoteException;
+}
