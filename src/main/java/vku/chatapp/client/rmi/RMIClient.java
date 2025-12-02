@@ -1,3 +1,6 @@
+// FILE: vku/chatapp/client/rmi/RMIClient.java
+// ✅ FIX: Thêm MessageService vào RMI client
+
 package vku.chatapp.client.rmi;
 
 import vku.chatapp.common.constants.AppConstants;
@@ -13,6 +16,7 @@ public class RMIClient {
     private IUserService userService;
     private IFriendService friendService;
     private IPeerDiscoveryService peerDiscoveryService;
+    private IMessageService messageService; // ✅ NEW
 
     private RMIClient() {}
 
@@ -35,7 +39,10 @@ public class RMIClient {
         friendService = (IFriendService) registry.lookup(AppConstants.RMI_FRIEND_SERVICE);
         peerDiscoveryService = (IPeerDiscoveryService) registry.lookup(AppConstants.RMI_PEER_DISCOVERY_SERVICE);
 
-        System.out.println("Connected to RMI server at " + host + ":" + port);
+        // ✅ NEW: Lookup MessageService
+        messageService = (IMessageService) registry.lookup("MessageService");
+
+        System.out.println("✅ Connected to RMI server at " + host + ":" + port);
     }
 
     public IAuthService getAuthService() {
@@ -52,6 +59,11 @@ public class RMIClient {
 
     public IPeerDiscoveryService getPeerDiscoveryService() {
         return peerDiscoveryService;
+    }
+
+    // ✅ NEW: Getter for MessageService
+    public IMessageService getMessageService() {
+        return messageService;
     }
 
     public boolean isConnected() {

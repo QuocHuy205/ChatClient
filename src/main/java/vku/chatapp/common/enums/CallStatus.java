@@ -7,5 +7,7 @@ public enum CallStatus {
     ENDED,
     REJECTED,
     MISSED,
-    FAILED
+    NO_ANSWER,
+    FAILED,
+    BUSY
 }

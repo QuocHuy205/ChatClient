@@ -1,12 +1,15 @@
+// FILE: vku/chatapp/client/media/audio/AudioStreamHandler.java
+// ✅ FIX: Add senderId to P2P messages
+
 package vku.chatapp.client.media.audio;
 
+import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
 import vku.chatapp.client.p2p.PeerRegistry;
 import vku.chatapp.common.dto.PeerInfo;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 
-import javax.sound.sampled.*;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -17,7 +20,6 @@ public class AudioStreamHandler {
     private PeerRegistry peerRegistry;
 
     private Thread captureThread;
-    private Thread playbackThread;
     private AtomicBoolean isStreaming;
     private Long remotePeerId;
 
@@ -35,7 +37,7 @@ public class AudioStreamHandler {
 
     public void startAudioStream(Long peerId) {
         if (isStreaming.get()) {
-            System.out.println("Audio stream already running");
+            System.out.println("⚠️ Audio stream already running");
             return;
         }
 
@@ -45,7 +47,7 @@ public class AudioStreamHandler {
         try {
             // Start audio capture
             capture.startCapture();
-            System.out.println("Audio capture started");
+            System.out.println("✅ Audio capture started");
 
             // Start sending audio
             captureThread = new Thread(this::captureAndSendLoop);
@@ -53,10 +55,10 @@ public class AudioStreamHandler {
             captureThread.setDaemon(true);
             captureThread.start();
 
-            System.out.println("Audio streaming started to peer: " + peerId);
+            System.out.println("✅ Audio streaming started to peer: " + peerId);
 
         } catch (Exception e) {
-            System.err.println("Error starting audio stream: " + e.getMessage());
+            System.err.println("❌ Error starting audio stream: " + e.getMessage());
             e.printStackTrace();
             stopAudioStream();
         }
@@ -77,12 +79,13 @@ public class AudioStreamHandler {
                 Thread.sleep(FRAME_INTERVAL_MS);
 
             } catch (InterruptedException e) {
-                System.out.println("Audio capture interrupted");
+                System.out.println("⚠️ Audio capture interrupted");
                 break;
             } catch (Exception e) {
-                System.err.println("Error in capture loop: " + e.getMessage());
+                System.err.println("❌ Error in capture loop: " + e.getMessage());
             }
         }
+        System.out.println("🛑 Audio capture loop ended");
     }
 
     private void sendAudioFrame(byte[] audioData) {
@@ -90,11 +93,14 @@ public class AudioStreamHandler {
 
         PeerInfo peerInfo = peerRegistry.getPeerInfo(remotePeerId);
         if (peerInfo == null) {
-            System.err.println("Peer not found: " + remotePeerId);
+            // System.err.println("❌ Peer not found: " + remotePeerId);
             return;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.AUDIO_STREAM, null, remotePeerId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.AUDIO_STREAM, senderId, remotePeerId);
         message.setMessageId(UUID.randomUUID().toString());
         message.setFileData(audioData);
         message.setTimestamp(System.currentTimeMillis());
@@ -112,7 +118,7 @@ public class AudioStreamHandler {
             // Start player if not started
             if (!player.isPlaying()) {
                 player.startPlayback();
-                System.out.println("Audio playback started");
+                System.out.println("✅ Audio playback started");
             }
 
             byte[] audioData = message.getFileData();
@@ -121,7 +127,7 @@ public class AudioStreamHandler {
             }
 
         } catch (Exception e) {
-            System.err.println("Error receiving audio stream: " + e.getMessage());
+            System.err.println("❌ Error receiving audio stream: " + e.getMessage());
         }
     }
 
@@ -147,7 +153,7 @@ public class AudioStreamHandler {
             }
         }
 
-        System.out.println("Audio streaming stopped");
+        System.out.println("✅ Audio streaming stopped");
     }
 
     public boolean isStreaming() {
@@ -156,8 +162,8 @@ public class AudioStreamHandler {
 
     // Audio quality settings
     public void setAudioQuality(AudioQuality quality) {
-        // Can be extended to support different quality levels
-        System.out.println("Audio quality set to: " + quality);
+        System.out.println("🎵 Audio quality set to: " + quality);
+        // TODO: Recreate AudioCapture and AudioPlayer with new format
     }
 
     public enum AudioQuality {
@@ -181,5 +187,4 @@ public class AudioStreamHandler {
             return bitDepth;
         }
     }
-
 }

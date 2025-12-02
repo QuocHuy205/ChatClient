@@ -1,5 +1,9 @@
+// FILE: vku/chatapp/client/service/CallService.java
+// ✅ FIX: Thêm senderId vào call messages
+
 package vku.chatapp.client.service;
 
+import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
 import vku.chatapp.client.p2p.PeerRegistry;
 import vku.chatapp.common.dto.PeerInfo;
@@ -21,12 +25,18 @@ public class CallService {
     public boolean initiateCall(Long receiverId, CallType callType) {
         PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
         if (peerInfo == null) {
+            System.err.println("❌ Peer not found for call: " + receiverId);
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.CALL_OFFER, null, receiverId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.CALL_OFFER, senderId, receiverId);
         message.setMessageId(UUID.randomUUID().toString());
         message.setContent(callType.name());
+
+        System.out.println("📞 Initiating " + callType + " call to " + receiverId);
 
         return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
@@ -34,11 +44,17 @@ public class CallService {
     public boolean answerCall(Long callerId, String callId) {
         PeerInfo peerInfo = peerRegistry.getPeerInfo(callerId);
         if (peerInfo == null) {
+            System.err.println("❌ Peer not found for answer: " + callerId);
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.CALL_ANSWER, null, callerId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.CALL_ANSWER, senderId, callerId);
         message.setMessageId(callId);
+
+        System.out.println("✅ Answering call from " + callerId);
 
         return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
@@ -46,11 +62,17 @@ public class CallService {
     public boolean rejectCall(Long callerId, String callId) {
         PeerInfo peerInfo = peerRegistry.getPeerInfo(callerId);
         if (peerInfo == null) {
+            System.err.println("❌ Peer not found for reject: " + callerId);
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.CALL_REJECT, null, callerId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.CALL_REJECT, senderId, callerId);
         message.setMessageId(callId);
+
+        System.out.println("❌ Rejecting call from " + callerId);
 
         return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
@@ -58,11 +80,17 @@ public class CallService {
     public boolean endCall(Long peerId, String callId) {
         PeerInfo peerInfo = peerRegistry.getPeerInfo(peerId);
         if (peerInfo == null) {
+            System.err.println("❌ Peer not found for end call: " + peerId);
             return false;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.CALL_END, null, peerId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.CALL_END, senderId, peerId);
         message.setMessageId(callId);
+
+        System.out.println("📞 Ending call with " + peerId);
 
         return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }

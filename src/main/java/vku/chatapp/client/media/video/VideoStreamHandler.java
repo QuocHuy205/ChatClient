@@ -1,6 +1,10 @@
+// FILE: vku/chatapp/client/media/video/VideoStreamHandler.java
+// ✅ FIX: Add senderId to P2P messages
+
 package vku.chatapp.client.media.video;
 
 import javafx.scene.image.ImageView;
+import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
 import vku.chatapp.client.p2p.PeerRegistry;
 import vku.chatapp.common.dto.PeerInfo;
@@ -27,7 +31,6 @@ public class VideoStreamHandler {
     private static final int FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
     private static final int VIDEO_WIDTH = 640;
     private static final int VIDEO_HEIGHT = 480;
-    private static final float JPEG_QUALITY = 0.7f;
 
     public VideoStreamHandler(ImageView localView, ImageView remoteView) {
         this.capture = new VideoCapture(VIDEO_WIDTH, VIDEO_HEIGHT);
@@ -39,7 +42,7 @@ public class VideoStreamHandler {
 
     public void startVideoStream(Long peerId) {
         if (isStreaming.get()) {
-            System.out.println("Video stream already running");
+            System.out.println("⚠️ Video stream already running");
             return;
         }
 
@@ -49,7 +52,7 @@ public class VideoStreamHandler {
         try {
             // Start video capture
             capture.startCapture();
-            System.out.println("Video capture started");
+            System.out.println("✅ Video capture started");
 
             // Start capture and send loop
             captureThread = new Thread(this::captureAndSendLoop);
@@ -57,10 +60,10 @@ public class VideoStreamHandler {
             captureThread.setDaemon(true);
             captureThread.start();
 
-            System.out.println("Video streaming started to peer: " + peerId);
+            System.out.println("✅ Video streaming started to peer: " + peerId);
 
         } catch (Exception e) {
-            System.err.println("Error starting video stream: " + e.getMessage());
+            System.err.println("❌ Error starting video stream: " + e.getMessage());
             e.printStackTrace();
             stopVideoStream();
         }
@@ -68,6 +71,7 @@ public class VideoStreamHandler {
 
     private void captureAndSendLoop() {
         long lastFrameTime = 0;
+        int frameCount = 0;
 
         while (isStreaming.get() && capture.isCapturing()) {
             try {
@@ -90,18 +94,24 @@ public class VideoStreamHandler {
                     if (encodedFrame != null && encodedFrame.length > 0) {
                         // Send to remote peer
                         sendVideoFrame(encodedFrame);
+
+                        frameCount++;
+                        if (frameCount % 30 == 0) {
+                            System.out.println("📹 Sent " + frameCount + " video frames");
+                        }
                     }
                 }
 
                 lastFrameTime = currentTime;
 
             } catch (InterruptedException e) {
-                System.out.println("Video capture interrupted");
+                System.out.println("⚠️ Video capture interrupted");
                 break;
             } catch (Exception e) {
-                System.err.println("Error in video capture loop: " + e.getMessage());
+                System.err.println("❌ Error in video capture loop: " + e.getMessage());
             }
         }
+        System.out.println("🛑 Video capture loop ended (sent " + frameCount + " frames)");
     }
 
     private byte[] encodeFrame(BufferedImage frame) {
@@ -114,7 +124,7 @@ public class VideoStreamHandler {
             return imageBytes;
 
         } catch (Exception e) {
-            System.err.println("Error encoding frame: " + e.getMessage());
+            System.err.println("❌ Error encoding frame: " + e.getMessage());
             return null;
         }
     }
@@ -124,11 +134,14 @@ public class VideoStreamHandler {
 
         PeerInfo peerInfo = peerRegistry.getPeerInfo(remotePeerId);
         if (peerInfo == null) {
-            System.err.println("Peer not found: " + remotePeerId);
+            // System.err.println("❌ Peer not found: " + remotePeerId);
             return;
         }
 
-        P2PMessage message = new P2PMessage(P2PMessageType.VIDEO_STREAM, null, remotePeerId);
+        // ✅ FIX: Add senderId
+        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+        P2PMessage message = new P2PMessage(P2PMessageType.VIDEO_STREAM, senderId, remotePeerId);
         message.setMessageId(UUID.randomUUID().toString());
         message.setFileData(frameData);
         message.setTimestamp(System.currentTimeMillis());
@@ -149,7 +162,7 @@ public class VideoStreamHandler {
             }
 
         } catch (Exception e) {
-            System.err.println("Error receiving video stream: " + e.getMessage());
+            System.err.println("❌ Error receiving video stream: " + e.getMessage());
         }
     }
 
@@ -170,7 +183,7 @@ public class VideoStreamHandler {
             }
         }
 
-        System.out.println("Video streaming stopped");
+        System.out.println("✅ Video streaming stopped");
     }
 
     public boolean isStreaming() {
@@ -180,7 +193,7 @@ public class VideoStreamHandler {
     // Video quality control
     public void setVideoQuality(VideoQuality quality) {
         capture.setResolution(quality.width, quality.height);
-        System.out.println("Video quality set to: " + quality);
+        System.out.println("📹 Video quality set to: " + quality);
     }
 
     public enum VideoQuality {

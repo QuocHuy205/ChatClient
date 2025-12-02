@@ -1,3 +1,6 @@
+// FILE: vku/chatapp/client/controller/VideoCallController.java
+// ✅ FIX: Infinite loop CALL_END + Update UI labels
+
 package vku.chatapp.client.controller;
 
 import javafx.animation.KeyFrame;
@@ -20,6 +23,7 @@ import vku.chatapp.common.enums.CallType;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public class VideoCallController extends BaseController {
@@ -29,10 +33,13 @@ public class VideoCallController extends BaseController {
     @FXML private Label peerNameLabel;
     @FXML private Label callStatusLabel;
     @FXML private Label callDurationLabel;
+    @FXML private Label remoteVideoPlaceholder; // ✅ NEW
     @FXML private Button muteButton;
     @FXML private Button videoToggleButton;
     @FXML private Button endCallButton;
     @FXML private Button switchCameraButton;
+    @FXML private Label muteLabel; // ✅ NEW
+    @FXML private Label videoLabel; // ✅ NEW
 
     private CallService callService;
     private MediaManager mediaManager;
@@ -40,8 +47,12 @@ public class VideoCallController extends BaseController {
     private CallSession currentCall;
     private Timeline durationTimer;
 
+    private Long callHistoryId;
+    private LocalDateTime callStartTime;
+
     private boolean isMuted = false;
     private boolean isVideoEnabled = true;
+    private boolean isCallEnded = false; // ✅ NEW: Flag để prevent double end
 
     @FXML
     public void initialize() {
@@ -50,6 +61,10 @@ public class VideoCallController extends BaseController {
 
         setupCallDurationTimer();
         setupMessageHandler();
+
+        // ✅ Set initial button states
+        updateMuteButton();
+        updateVideoButton();
     }
 
     private void setupCallDurationTimer() {
@@ -73,7 +88,6 @@ public class VideoCallController extends BaseController {
         setupMessageHandler();
     }
 
-    // Initiate outgoing call
     public void initiateCall(UserDTO peer, CallType callType) {
         String callId = UUID.randomUUID().toString();
         boolean isCaller = true;
@@ -83,104 +97,168 @@ public class VideoCallController extends BaseController {
         peerNameLabel.setText(peer.getDisplayName());
         callStatusLabel.setText("Calling...");
 
-        // Send call offer
+        if (remoteVideoPlaceholder != null) {
+            remoteVideoPlaceholder.setText("Calling " + peer.getDisplayName() + "...");
+        }
+
         boolean sent = callService.initiateCall(peer.getId(), callType);
 
         if (sent) {
             currentCall.setStatus(CallStatus.RINGING);
 
-            // Timeout after 30 seconds
             Timeline timeout = new Timeline(new KeyFrame(Duration.seconds(30), e -> {
-                if (currentCall.getStatus() == CallStatus.RINGING) {
+                if (currentCall != null && currentCall.getStatus() == CallStatus.RINGING) {
                     handleCallTimeout();
                 }
             }));
             timeout.play();
+
+            System.out.println("✅ Call initiated: " + callType + " to " + peer.getDisplayName());
         } else {
             showError("Call Failed", "Could not initiate call. User may be offline.");
+            updateCallStatus(CallStatus.FAILED);
             handleEndCall();
         }
     }
 
-    // Receive incoming call
     public void receiveCall(CallSession incomingCall) {
         this.currentCall = incomingCall;
 
         peerNameLabel.setText(incomingCall.getPeer().getDisplayName());
         callStatusLabel.setText("Incoming " +
-                (incomingCall.getCallType() == CallType.VIDEO ? "Video" : "Voice") +
+                (incomingCall.getCallType() == CallType.VIDEO ? "Video" : "Audio") +
                 " Call");
 
-        // Show accept/reject UI
+        if (remoteVideoPlaceholder != null) {
+            remoteVideoPlaceholder.setText("Incoming call from " +
+                    incomingCall.getPeer().getDisplayName());
+        }
+
         showIncomingCallUI();
     }
 
+    private void updateCallStatus(CallStatus status) {
+        if (currentCall != null) {
+            currentCall.setStatus(status);
+        }
+    }
+
     private void showIncomingCallUI() {
-        // TODO: Show accept/reject buttons
-        // For now, auto-accept for testing
-        handleAcceptCall();
+        Platform.runLater(() -> {
+            callStatusLabel.setText("Auto-accepting call...");
+            new Timeline(new KeyFrame(Duration.seconds(1), e -> handleAcceptCall())).play();
+        });
     }
 
     private void handleAcceptCall() {
         if (currentCall == null) return;
 
-        // Send answer
+        System.out.println("✅ Accepting call from " + currentCall.getPeer().getDisplayName());
+
         callService.answerCall(currentCall.getPeer().getId(), currentCall.getCallId());
 
-        // Start media streams
         startMediaStreams();
     }
 
     private void startMediaStreams() {
+        callStartTime = LocalDateTime.now();
         currentCall.start();
         callStatusLabel.setText("Connected");
-        durationTimer.play();
 
-        // Start media
-        if (currentCall.getCallType() == CallType.VIDEO) {
-            mediaManager.startCall(currentCall, localVideoView, remoteVideoView);
-        } else {
-            mediaManager.startCall(currentCall, null, null);
+        if (remoteVideoPlaceholder != null) {
+            remoteVideoPlaceholder.setText("Connected to " + currentCall.getPeer().getDisplayName());
         }
 
-        System.out.println("Media streams started");
+        durationTimer.play();
+
+        updateCallStatus(CallStatus.CONNECTED);
+
+        try {
+            if (currentCall.getCallType() == CallType.VIDEO) {
+                mediaManager.startCall(currentCall, localVideoView, remoteVideoView);
+                System.out.println("✅ Video call started (placeholder mode)");
+            } else {
+                mediaManager.startCall(currentCall, null, null);
+                System.out.println("✅ Audio call started (placeholder mode)");
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error starting media: " + e.getMessage());
+            callStatusLabel.setText("Media Error");
+        }
     }
 
     @FXML
     private void handleEndCall() {
-        if (currentCall == null) return;
+        // ✅ FIX: Prevent double call to endCall
+        if (isCallEnded) {
+            System.out.println("⚠️ Call already ended, ignoring duplicate end request");
+            return;
+        }
 
-        // Send end call message
-        callService.endCall(currentCall.getPeer().getId(), currentCall.getCallId());
+        isCallEnded = true;
 
-        // Stop media
-        mediaManager.endCall();
+        if (currentCall == null) {
+            closeWindow();
+            return;
+        }
 
-        // Stop timer
+        System.out.println("📞 Ending call with " + currentCall.getPeer().getDisplayName());
+
+        int durationSeconds = 0;
+        if (callStartTime != null) {
+            durationSeconds = (int) java.time.Duration.between(
+                    callStartTime,
+                    LocalDateTime.now()
+            ).getSeconds();
+        }
+
+        // ✅ FIX: Only send CALL_END if we haven't received one
+        if (currentCall.getStatus() != CallStatus.ENDED) {
+            callService.endCall(currentCall.getPeer().getId(), currentCall.getCallId());
+            System.out.println("📤 Sent CALL_END message");
+        } else {
+            System.out.println("⚠️ Call already ended by peer, not sending CALL_END");
+        }
+
+        try {
+            mediaManager.endCall();
+        } catch (Exception e) {
+            System.err.println("⚠️ Error ending media: " + e.getMessage());
+        }
+
         if (durationTimer != null) {
             durationTimer.stop();
         }
 
-        // Update status
-        if (currentCall != null) {
-            currentCall.end();
-        }
+        currentCall.end();
+        updateCallStatus(CallStatus.ENDED);
 
-        // Close window or go back
-        Platform.runLater(() -> {
-            if (stage != null) {
-                stage.close();
-            }
-        });
+        System.out.println("📞 Call ended. Duration: " + durationSeconds + " seconds");
+
+        closeWindow();
     }
 
     @FXML
     private void handleMute() {
         isMuted = !isMuted;
-        muteButton.setText(isMuted ? "🔇" : "🔊");
+        updateMuteButton();
 
-        // TODO: Implement actual mute functionality
-        System.out.println("Mute: " + isMuted);
+        try {
+            mediaManager.setMuted(isMuted);
+            System.out.println((isMuted ? "🔇" : "🔊") + " Microphone " + (isMuted ? "muted" : "unmuted"));
+        } catch (Exception e) {
+            System.err.println("❌ Error toggling mute: " + e.getMessage());
+        }
+    }
+
+    private void updateMuteButton() {
+        if (isMuted) {
+            muteButton.setStyle("-fx-background-color: #d13438; -fx-background-radius: 30px; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold;");
+            if (muteLabel != null) muteLabel.setText("Unmute");
+        } else {
+            muteButton.setStyle("-fx-background-color: #4a4a4a; -fx-background-radius: 30px; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold;");
+            if (muteLabel != null) muteLabel.setText("Mute");
+        }
     }
 
     @FXML
@@ -190,19 +268,49 @@ public class VideoCallController extends BaseController {
         }
 
         isVideoEnabled = !isVideoEnabled;
-        videoToggleButton.setText(isVideoEnabled ? "📹" : "📹❌");
+        updateVideoButton();
 
-        // TODO: Implement video toggle
-        System.out.println("Video enabled: " + isVideoEnabled);
+        try {
+            mediaManager.setVideoEnabled(isVideoEnabled);
+            System.out.println((isVideoEnabled ? "🎥" : "🎥❌") + " Video " + (isVideoEnabled ? "enabled" : "disabled"));
+        } catch (Exception e) {
+            System.err.println("❌ Error toggling video: " + e.getMessage());
+        }
+    }
+
+    private void updateVideoButton() {
+        if (isVideoEnabled) {
+            videoToggleButton.setStyle("-fx-background-color: #4a4a4a; -fx-background-radius: 30px; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold;");
+            if (videoLabel != null) videoLabel.setText("Video On");
+        } else {
+            videoToggleButton.setStyle("-fx-background-color: #d13438; -fx-background-radius: 30px; -fx-text-fill: white; -fx-font-size: 11px; -fx-font-weight: bold;");
+            if (videoLabel != null) videoLabel.setText("Video Off");
+        }
     }
 
     @FXML
     private void handleSwitchCamera() {
-        // TODO: Implement camera switching
-        System.out.println("Switch camera");
+        try {
+            mediaManager.switchCamera();
+            System.out.println("🔄 Camera switched");
+        } catch (Exception e) {
+            System.err.println("❌ Error switching camera: " + e.getMessage());
+        }
     }
 
     private void handleCallMessage(P2PMessage message) {
+        // ✅ FIX: Ignore messages if call already ended
+        if (isCallEnded) {
+            System.out.println("⚠️ Ignoring message, call already ended: " + message.getType());
+            return;
+        }
+
+        if (currentCall == null) return;
+
+        if (!message.getSenderId().equals(currentCall.getPeer().getId())) {
+            return;
+        }
+
         Platform.runLater(() -> {
             switch (message.getType()) {
                 case CALL_OFFER:
@@ -228,7 +336,7 @@ public class VideoCallController extends BaseController {
     }
 
     private void handleCallOffer(P2PMessage message) {
-        // This is handled by main controller showing this window
+        // Handled by main controller
     }
 
     private void handleCallAnswer(P2PMessage message) {
@@ -236,33 +344,53 @@ public class VideoCallController extends BaseController {
             return;
         }
 
-        // Remote peer answered
+        System.out.println("✅ Call answered by " + currentCall.getPeer().getDisplayName());
         startMediaStreams();
     }
 
     private void handleCallReject(P2PMessage message) {
-        callStatusLabel.setText("Call Rejected");
+        System.out.println("❌ Call rejected by " + currentCall.getPeer().getDisplayName());
 
-        // Show message and close
+        callStatusLabel.setText("Call Rejected");
+        updateCallStatus(CallStatus.REJECTED);
+
         Platform.runLater(() -> {
             showInfo("Call Rejected", "The call was rejected");
-            handleEndCall();
+            new Timeline(new KeyFrame(Duration.seconds(2), e -> handleEndCall())).play();
         });
     }
 
     private void handleCallEnd(P2PMessage message) {
-        callStatusLabel.setText("Call Ended");
+        // ✅ FIX: Set status to ENDED to prevent sending another CALL_END
+        if (currentCall != null) {
+            currentCall.setStatus(CallStatus.ENDED);
+        }
 
-        // End call
+        System.out.println("📞 Call ended by " +
+                (currentCall != null ? currentCall.getPeer().getDisplayName() : "peer"));
+
+        callStatusLabel.setText("Call Ended");
         handleEndCall();
     }
 
     private void handleCallTimeout() {
+        System.out.println("⏰ Call timeout - no answer");
+
         callStatusLabel.setText("No Answer");
+        updateCallStatus(CallStatus.NO_ANSWER);
 
         Platform.runLater(() -> {
             showInfo("Call Timeout", "No answer from " + currentCall.getPeer().getDisplayName());
-            handleEndCall();
+            new Timeline(new KeyFrame(Duration.seconds(2), e -> handleEndCall())).play();
+        });
+    }
+
+    private void closeWindow() {
+        Platform.runLater(() -> {
+            if (stage != null) {
+                stage.close();
+                System.out.println("✅ Call window closed");
+            }
         });
     }
 

@@ -34,12 +34,19 @@
 
         <!-- Action Buttons -->
         <HBox spacing="10">
-            <Button text="📞" styleClass="icon-button-large">
+            <!-- ✅ FIX: Add onAction handlers -->
+            <Button fx:id="audioCallButton"
+                    text="📞"
+                    styleClass="icon-button-large"
+                    onAction="#handleAudioCall">
                 <tooltip>
                     <Tooltip text="Voice Call"/>
                 </tooltip>
             </Button>
-            <Button text="📹" styleClass="icon-button-large">
+            <Button fx:id="videoCallButton"
+                    text="🎥"
+                    styleClass="icon-button-large"
+                    onAction="#handleVideoCall">
                 <tooltip>
                     <Tooltip text="Video Call"/>
                 </tooltip>
