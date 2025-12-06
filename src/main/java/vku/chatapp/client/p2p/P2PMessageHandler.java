@@ -1,6 +1,7 @@
 package vku.chatapp.client.p2p;
 
 import vku.chatapp.client.media.MediaManager;
+import vku.chatapp.common.dto.PeerInfo;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 
@@ -19,6 +20,26 @@ public class P2PMessageHandler {
 
     public void handleMessage(P2PMessage message, Socket socket) {
         System.out.println("Received P2P message: " + message.getType());
+
+        PeerRegistry.getInstance().updatePeer(
+                message.getSenderId(),
+                message.getSourceIp(),
+                message.getSourcePort()
+        );
+
+        long senderId = message.getSenderId();
+        PeerRegistry registry = PeerRegistry.getInstance();
+
+        // 🔥 Nếu chưa có peer → auto-add
+        if (registry.getPeer(senderId) == null) {
+            registry.addPeer(new PeerInfo(
+                    senderId,
+                    socket.getInetAddress().getHostAddress(),
+                    socket.getPort()
+            ));
+
+            System.out.println("🙌 Auto-added peer from incoming message: " + senderId);
+        }
 
         // Handle media streams directly
         if (message.getType() == P2PMessageType.AUDIO_STREAM) {

@@ -38,8 +38,8 @@
                 </Label>
 
                 <VBox spacing="5">
-                    <Label text="Username" styleClass="field-label"/>
-                    <TextField fx:id="usernameField" promptText="Enter your username"
+                    <Label text="Email" styleClass="field-label"/>
+                    <TextField fx:id="emailField" promptText="Enter your email"
                                styleClass="custom-text-field"/>
                 </VBox>
 

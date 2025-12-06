@@ -10,9 +10,9 @@ public class AuthService {
         this.rmiClient = RMIClient.getInstance();
     }
 
-    public AuthResponse login(String username, String password, boolean rememberMe) {
+    public AuthResponse login(String email, String password, boolean rememberMe) {
         try {
-            LoginRequest request = new LoginRequest(username, password, rememberMe);
+            LoginRequest request = new LoginRequest(email, password, rememberMe);
             return rmiClient.getAuthService().login(request);
         } catch (Exception e) {
             e.printStackTrace();

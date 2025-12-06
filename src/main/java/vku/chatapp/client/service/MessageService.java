@@ -1,98 +1,158 @@
 // FILE: vku/chatapp/client/service/MessageService.java
-// ✅ FIX: Thêm senderId vào P2PMessage
+// ✅ FIX: Always fetch fresh peer info before sending messages
 
 package vku.chatapp.client.service;
 
+import vku.chatapp.client.model.UserSession;
+import vku.chatapp.client.p2p.P2PClient;
+import vku.chatapp.client.p2p.PeerRegistry;
+import vku.chatapp.client.rmi.RMIClient;
 import vku.chatapp.common.dto.PeerInfo;
 import vku.chatapp.common.enums.MessageType;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
-import vku.chatapp.client.p2p.P2PClient;
-import vku.chatapp.client.p2p.PeerRegistry;
-import vku.chatapp.client.model.UserSession;
 
 import java.util.UUID;
 
 public class MessageService {
     private final P2PClient p2pClient;
-    private final PeerRegistry peerRegistry;
 
     public MessageService() {
         this.p2pClient = new P2PClient();
-        this.peerRegistry = PeerRegistry.getInstance();
     }
 
+    /**
+     * ✅ FIXED: Fetch fresh peer info before sending text message
+     */
     public boolean sendTextMessage(Long receiverId, String content) {
-        PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
-        if (peerInfo == null) {
-            System.err.println("❌ Peer not found: " + receiverId);
-            System.err.println("Available peers: " + peerRegistry);
+        try {
+            // ✅ Get fresh peer info from server
+            PeerInfo peerInfo = fetchFreshPeerInfo(receiverId);
+            if (peerInfo == null) {
+                System.err.println("❌ Receiver not online: " + receiverId);
+                return false;
+            }
+
+            // ✅ Update local registry
+            PeerRegistry.getInstance().addPeer(peerInfo);
+
+            // ✅ Send message
+            Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+            P2PMessage message = new P2PMessage(
+                    P2PMessageType.TEXT_MESSAGE,
+                    senderId,
+                    receiverId
+            );
+            message.setMessageId(UUID.randomUUID().toString());
+            message.setContent(content);
+            message.setContentType(MessageType.TEXT);
+
+            System.out.println("📤 Sending message from " + senderId + " to " + receiverId);
+            System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
+
+            return p2pClient.sendMessage(
+                    peerInfo.getAddress(),
+                    peerInfo.getPort(),
+                    message
+            );
+
+        } catch (Exception e) {
+            System.err.println("❌ Error sending text message: " + e.getMessage());
             return false;
         }
-
-        // ✅ FIX 7: THÊM SENDER_ID VÀO MESSAGE
-        Long senderId = UserSession.getInstance().getCurrentUser().getId();
-
-        P2PMessage message = new P2PMessage(P2PMessageType.TEXT_MESSAGE, senderId, receiverId);
-        message.setMessageId(UUID.randomUUID().toString());
-        message.setContent(content);
-        message.setContentType(MessageType.TEXT);
-
-        System.out.println("📤 Sending message from " + senderId + " to " + receiverId);
-        System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
-
-        return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
 
-    public void sendTextMessageAsync(Long receiverId, String content) {
-        new Thread(() -> sendTextMessage(receiverId, content)).start();
-    }
-
-    public boolean sendFile(Long receiverId, String fileName, byte[] fileData) {
-        PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
-        if (peerInfo == null) {
-            return false;
-        }
-
-        // ✅ FIX: THÊM SENDER_ID
-        Long senderId = UserSession.getInstance().getCurrentUser().getId();
-
-        P2PMessage message = new P2PMessage(P2PMessageType.FILE_TRANSFER, senderId, receiverId);
-        message.setMessageId(UUID.randomUUID().toString());
-        message.setFileName(fileName);
-        message.setFileData(fileData);
-        message.setContentType(MessageType.FILE);
-
-        return p2pClient.sendMessage(peerInfo.getAddress(), peerInfo.getPort(), message);
-    }
-
+    /**
+     * ✅ FIXED: Fetch fresh peer info before sending typing indicator
+     */
     public void sendTypingIndicator(Long receiverId, boolean isTyping) {
-        PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
-        if (peerInfo == null) {
-            return;
+        try {
+            // ✅ Get peer info (use cached if available, else fetch)
+            PeerInfo peerInfo = PeerRegistry.getInstance().getPeerInfo(receiverId);
+
+            if (peerInfo == null) {
+                peerInfo = fetchFreshPeerInfo(receiverId);
+                if (peerInfo == null) {
+                    return; // Silently fail for typing indicator
+                }
+                PeerRegistry.getInstance().addPeer(peerInfo);
+            }
+
+            Long senderId = UserSession.getInstance().getCurrentUser().getId();
+
+            P2PMessage message = new P2PMessage(
+                    P2PMessageType.TYPING_INDICATOR,
+                    senderId,
+                    receiverId
+            );
+            message.setContent(String.valueOf(isTyping));
+
+            p2pClient.sendMessageAsync(
+                    peerInfo.getAddress(),
+                    peerInfo.getPort(),
+                    message
+            );
+
+        } catch (Exception e) {
+            // Silently ignore typing indicator errors
         }
-
-        // ✅ FIX: THÊM SENDER_ID
-        Long senderId = UserSession.getInstance().getCurrentUser().getId();
-
-        P2PMessage message = new P2PMessage(P2PMessageType.TYPING_INDICATOR, senderId, receiverId);
-        message.setContent(String.valueOf(isTyping));
-
-        p2pClient.sendMessageAsync(peerInfo.getAddress(), peerInfo.getPort(), message);
     }
 
-    public void sendReadReceipt(Long receiverId, String messageId) {
-        PeerInfo peerInfo = peerRegistry.getPeerInfo(receiverId);
-        if (peerInfo == null) {
-            return;
+    /**
+     * ✅ FIXED: Fetch fresh peer info before sending read receipt
+     */
+    public void sendReadReceipt(Long senderId, String messageId) {
+        try {
+            PeerInfo peerInfo = PeerRegistry.getInstance().getPeerInfo(senderId);
+
+            if (peerInfo == null) {
+                peerInfo = fetchFreshPeerInfo(senderId);
+                if (peerInfo == null) {
+                    return; // Silently fail
+                }
+                PeerRegistry.getInstance().addPeer(peerInfo);
+            }
+
+            Long readerId = UserSession.getInstance().getCurrentUser().getId();
+
+            P2PMessage message = new P2PMessage(
+                    P2PMessageType.READ_RECEIPT,
+                    readerId,
+                    senderId
+            );
+            message.setMessageId(messageId);
+
+            p2pClient.sendMessageAsync(
+                    peerInfo.getAddress(),
+                    peerInfo.getPort(),
+                    message
+            );
+
+        } catch (Exception e) {
+            // Silently ignore read receipt errors
         }
+    }
 
-        // ✅ FIX: THÊM SENDER_ID
-        Long senderId = UserSession.getInstance().getCurrentUser().getId();
+    /**
+     * ✅ NEW: Fetch fresh peer info from RMI server
+     */
+    private PeerInfo fetchFreshPeerInfo(Long userId) {
+        try {
+            PeerInfo peerInfo = RMIClient.getInstance()
+                    .getPeerDiscoveryService()
+                    .getPeerInfo(userId);
 
-        P2PMessage message = new P2PMessage(P2PMessageType.READ_RECEIPT, senderId, receiverId);
-        message.setMessageId(messageId);
+            if (peerInfo != null) {
+                System.out.println("✅ Fetched peer info for " + userId +
+                        ": " + peerInfo.getAddress() + ":" + peerInfo.getPort());
+            }
 
-        p2pClient.sendMessageAsync(peerInfo.getAddress(), peerInfo.getPort(), message);
+            return peerInfo;
+
+        } catch (Exception e) {
+            System.err.println("❌ Error fetching peer info: " + e.getMessage());
+            return null;
+        }
     }
 }

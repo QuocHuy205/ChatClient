@@ -79,7 +79,6 @@ public class MainController extends BaseController {
         startHeartbeat();
         startStatusPolling(); // ✅ NEW
     }
-
     private void initializeP2PServer() {
         try {
             messageHandler = new P2PMessageHandler();
@@ -244,7 +243,6 @@ public class MainController extends BaseController {
             }
         });
     }
-
     private void setupFriendFilter() {
         filterFriendField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal == null || newVal.trim().isEmpty()) {
@@ -386,11 +384,27 @@ public class MainController extends BaseController {
 
     private void handleIncomingMessage(P2PMessage message) {
         Platform.runLater(() -> {
+
+            // ⭐⭐ FIX QUAN TRỌNG: AUTO-REGISTER PEER ⭐⭐
+            long senderId = message.getSenderId();
+            PeerRegistry registry = PeerRegistry.getInstance();
+
+            if (registry.getPeer(senderId) == null) {
+                // Tự thêm peer nếu chưa có
+                registry.addPeer(new PeerInfo(
+                        senderId,
+                        message.getSourceIp(),
+                        message.getSourcePort()
+                ));
+                System.out.println("🔧 Auto-added peer from CALL message: " + senderId);
+            }
+            // --------------------------------------------------------
             if (message.getType() == P2PMessageType.CALL_OFFER) {
                 handleIncomingCall(message);
             }
         });
     }
+
 
     private void handleIncomingCall(P2PMessage message) {
         CallType callType = CallType.valueOf(message.getContent());

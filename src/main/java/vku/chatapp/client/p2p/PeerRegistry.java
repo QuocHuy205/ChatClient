@@ -51,4 +51,25 @@ public class PeerRegistry {
     public void clear() {
         peers.clear();
     }
+
+    public void updatePeer(Long userId, String ip, int port) {
+        PeerConnection pc = peers.get(userId);
+
+        if (pc == null) {
+            // peer chưa tồn tại → tạo mới
+            PeerInfo info = new PeerInfo();
+            info.setUserId(userId);
+            info.setAddress(ip);
+            info.setPort(port);
+
+            peers.put(userId, new PeerConnection(info));
+            return;
+        }
+
+        // cập nhật peer cũ
+        pc.getPeerInfo().setAddress(ip);
+        pc.getPeerInfo().setPort(port);
+        pc.updateLastContact();
+    }
+
 }

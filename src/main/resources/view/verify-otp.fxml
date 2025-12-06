@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.text.Font?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="vku.chatapp.client.controller.component.VerifyOtpController"
+      alignment="CENTER" spacing="20" style="-fx-background-color: #f8f9fa; -fx-padding: 40;">
+
+    <Label text="XÁC THỰC OTP" alignment="CENTER">
+        <font>
+            <Font name="System Bold" size="28"/>
+        </font>
+        <style>
+            -fx-text-fill: #2d87d7;
+        </style>
+    </Label>
+
+    <Label fx:id="lblMessage" text="Mã xác thực đã được gửi đến email của bạn"
+           wrapText="true" alignment="CENTER" style="-fx-text-fill: #666; -fx-font-size: 14;"/>
+
+    <HBox alignment="CENTER" spacing="10">
+        <TextField fx:id="otp1" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+        <TextField fx:id="otp2" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+        <TextField fx:id="otp3" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+        <TextField fx:id="otp4" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+        <TextField fx:id="otp5" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+        <TextField fx:id="otp6" prefWidth="50" prefHeight="50" alignment="CENTER" style="-fx-font-size: 20; -fx-background-radius: 8; -fx-border-radius: 8; -fx-border-color: #ced4da;"/>
+    </HBox>
+
+    <Label fx:id="timerLabel" text="05:00" alignment="CENTER">
+        <font>
+            <Font name="System Bold" size="18"/>
+        </font>
+        <style>
+            -fx-text-fill: #dc3545;
+        </style>
+    </Label>
+
+    <HBox alignment="CENTER" spacing="15">
+        <Button text="Xác nhận" onAction="#handleVerify"
+                style="-fx-background-color: #28a745; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 8; -fx-cursor: hand;"/>
+
+        <Button fx:id="resendButton" text="Gửi lại mã" onAction="#handleResend" disable="true"
+                style="-fx-background-color: #007bff; -fx-text-fill: white; -fx-font-weight: bold; -fx-padding: 10 20; -fx-background-radius: 8; -fx-cursor: hand;"/>
+    </HBox>
+
+    <Hyperlink text="Quay lại đăng nhập" onAction="#handleBackToLogin" style="-fx-text-fill: #6c757d;"/>
+
+</VBox>

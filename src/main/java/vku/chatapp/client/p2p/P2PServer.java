@@ -64,8 +64,15 @@ public class P2PServer {
 
     private void handleClient(Socket socket) {
         try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
+
             P2PMessage message = (P2PMessage) ois.readObject();
+
+            // ⭐ FIX QUAN TRỌNG: Lưu IP + PORT của peer gửi
+            message.setSourceIp(socket.getInetAddress().getHostAddress());
+            message.setSourcePort(socket.getPort());
+
             messageHandler.handleMessage(message, socket);
+
         } catch (Exception e) {
             System.err.println("Error handling client: " + e.getMessage());
         } finally {
@@ -76,6 +83,7 @@ public class P2PServer {
             }
         }
     }
+
 
     public void stop() {
         running = false;

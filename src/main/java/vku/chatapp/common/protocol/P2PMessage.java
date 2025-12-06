@@ -17,6 +17,10 @@ public class P2PMessage implements Serializable {
     private String fileName;
     private long timestamp;
 
+    // ⭐ QUAN TRỌNG: để peer nhận tự động ghi nhớ IP/PORT bên gửi
+    private String sourceIp;
+    private int sourcePort;
+
     public P2PMessage() {
         this.timestamp = System.currentTimeMillis();
     }
@@ -28,7 +32,6 @@ public class P2PMessage implements Serializable {
         this.receiverId = receiverId;
     }
 
-    // Getters and Setters
     public String getMessageId() { return messageId; }
     public void setMessageId(String messageId) { this.messageId = messageId; }
 
@@ -55,4 +58,11 @@ public class P2PMessage implements Serializable {
 
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
+
+    // ⭐ NEW: GETTER + SETTER CHO source IP/PORT
+    public String getSourceIp() { return sourceIp; }
+    public void setSourceIp(String sourceIp) { this.sourceIp = sourceIp; }
+
+    public int getSourcePort() { return sourcePort; }
+    public void setSourcePort(int sourcePort) { this.sourcePort = sourcePort; }
 }
