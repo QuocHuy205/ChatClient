@@ -86,7 +86,7 @@
 
             <Separator/>
 
-            <!-- Tabs for Friends and Chats -->
+            <!-- Tabs for Friends, Requests and Chats -->
             <TabPane styleClass="sidebar-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
 
                 <!-- Friends Tab -->
@@ -117,6 +117,47 @@
                                 </VBox>
                             </placeholder>
                         </ListView>
+                    </VBox>
+                </Tab>
+
+                <!-- Friend Requests Tab -->
+                <Tab text="Requests">
+                    <graphic>
+                        <HBox spacing="5" alignment="CENTER_LEFT">
+                            <Label text="Requests"/>
+                            <Label fx:id="requestBadgeLabel" text="0"
+                                   styleClass="badge-label"
+                                   visible="false" managed="false"/>
+                        </HBox>
+                    </graphic>
+                    <VBox spacing="0" VBox.vgrow="ALWAYS">
+
+                        <!-- Sub-tabs for Received and Sent -->
+                        <TabPane styleClass="sub-tabs" tabClosingPolicy="UNAVAILABLE" VBox.vgrow="ALWAYS">
+
+                            <!-- Received Requests -->
+                            <Tab text="Received">
+                                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+                                    <VBox fx:id="receivedRequestsBox" spacing="0" styleClass="requests-container">
+                                        <padding>
+                                            <Insets top="5" right="5" bottom="5" left="5"/>
+                                        </padding>
+                                    </VBox>
+                                </ScrollPane>
+                            </Tab>
+
+                            <!-- Sent Requests -->
+                            <Tab text="Sent">
+                                <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+                                    <VBox fx:id="sentRequestsBox" spacing="0" styleClass="requests-container">
+                                        <padding>
+                                            <Insets top="5" right="5" bottom="5" left="5"/>
+                                        </padding>
+                                    </VBox>
+                                </ScrollPane>
+                            </Tab>
+
+                        </TabPane>
                     </VBox>
                 </Tab>
 

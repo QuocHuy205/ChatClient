@@ -41,6 +41,15 @@ public class FriendService {
         }
     }
 
+    public boolean cancelFriendRequest(Long requestId, Long userId) {
+        try {
+            return rmiClient.getFriendService().cancelFriendRequest(requestId, userId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
     public boolean removeFriend(Long userId, Long friendId) {
         try {
             return rmiClient.getFriendService().removeFriend(userId, friendId);
@@ -65,6 +74,24 @@ public class FriendService {
         } catch (Exception e) {
             e.printStackTrace();
             return Collections.emptyList();
+        }
+    }
+
+    public List<Friend> getSentRequests(Long userId) {
+        try {
+            return rmiClient.getFriendService().getSentRequests(userId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Collections.emptyList();
+        }
+    }
+
+    public UserDTO searchUserByUsername(String username) {
+        try {
+            return rmiClient.getFriendService().searchUserByUsername(username);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
         }
     }
 }
