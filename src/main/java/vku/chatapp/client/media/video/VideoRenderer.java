@@ -1,33 +1,90 @@
 package vku.chatapp.client.media.video;
 
-import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
+import org.bytedeco.javacv.Frame;
+import org.bytedeco.javacv.Java2DFrameConverter;
 
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import javax.imageio.ImageIO;
 
+/**
+ * VideoRenderer - Optimized for JavaCV
+ * Converts byte arrays to JavaCV Frames efficiently
+ */
 public class VideoRenderer {
-    private ImageView videoView;
+    private Java2DFrameConverter converter;
+    private int frameCount = 0;
+    private long lastStatsTime = System.currentTimeMillis();
+    private int statsFrameCount = 0;
 
-    public VideoRenderer(ImageView videoView) {
-        this.videoView = videoView;
+    public VideoRenderer() {
+        this.converter = new Java2DFrameConverter();
+        System.out.println("✅ VideoRenderer initialized (JavaCV mode)");
     }
 
-    public void renderFrame(byte[] frameData) {
+    /**
+     * Render frame data to JavaCV Frame
+     * @param frameData JPEG encoded frame data
+     * @return JavaCV Frame or null if error
+     */
+    public Frame renderFrame(byte[] frameData) {
         if (frameData == null || frameData.length == 0) {
-            return;
+            return null;
         }
 
         try {
-            // Decode and display frame
+            // Decode JPEG to BufferedImage
             ByteArrayInputStream bis = new ByteArrayInputStream(frameData);
-            Image image = new Image(bis);
+            BufferedImage image = ImageIO.read(bis);
 
-            javafx.application.Platform.runLater(() -> {
-                videoView.setImage(image);
-            });
+            if (image == null) {
+                System.err.println("❌ Error decoding image from bytes");
+                return null;
+            }
+
+            // Convert to JavaCV Frame
+            Frame frame = converter.convert(image);
+
+            frameCount++;
+            statsFrameCount++;
+
+            if (frameCount == 1) {
+                System.out.println("✅ First frame rendered!");
+            }
+
+            // Stats every 2 seconds
+            long currentTime = System.currentTimeMillis();
+            if (currentTime - lastStatsTime >= 2000 && statsFrameCount > 0) {
+                int fps = (int) (statsFrameCount / ((currentTime - lastStatsTime) / 1000.0));
+                System.out.println("✅ Rendering: " + fps + " fps, " +
+                        "Total frames: " + frameCount +
+                        ", Frame size: " + (frameData.length / 1024) + " KB");
+                lastStatsTime = currentTime;
+                statsFrameCount = 0;
+            }
+
+            return frame;
 
         } catch (Exception e) {
-            System.err.println("Error rendering video frame: " + e.getMessage());
+            System.err.println("❌ Error rendering video frame: " + e.getMessage());
+            return null;
         }
+    }
+
+    /**
+     * Get total frames rendered
+     */
+    public int getFrameCount() {
+        return frameCount;
+    }
+
+    /**
+     * Reset frame counter
+     */
+    public void reset() {
+        frameCount = 0;
+        statsFrameCount = 0;
+        lastStatsTime = System.currentTimeMillis();
+        System.out.println("🔄 VideoRenderer reset");
     }
 }

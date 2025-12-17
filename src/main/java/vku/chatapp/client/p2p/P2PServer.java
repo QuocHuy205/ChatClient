@@ -22,7 +22,6 @@ public class P2PServer {
     }
 
     public void start(int preferredPort) throws IOException {
-        // Try to find an available port starting from preferredPort
         int maxAttempts = 100;
         int attemptPort = preferredPort;
 
@@ -32,9 +31,8 @@ public class P2PServer {
                 this.port = attemptPort;
                 this.running = true;
 
-                System.out.println("P2P Server started on port " + port);
+                System.out.println("✅ P2P Server started on port " + port);
 
-                // Start accepting connections
                 Thread acceptThread = new Thread(() -> {
                     while (running) {
                         try {
@@ -42,18 +40,18 @@ public class P2PServer {
                             executorService.submit(() -> handleClient(clientSocket));
                         } catch (IOException e) {
                             if (running) {
-                                System.err.println("Error accepting connection: " + e.getMessage());
+                                System.err.println("❌ Error accepting connection: " + e.getMessage());
                             }
                         }
                     }
                 });
                 acceptThread.setDaemon(true);
+                acceptThread.setName("P2P-Accept-Thread");
                 acceptThread.start();
 
-                return; // Success
+                return;
 
             } catch (IOException e) {
-                // Port in use, try next port
                 attemptPort++;
                 if (i == maxAttempts - 1) {
                     throw new IOException("Could not find available port after " + maxAttempts + " attempts", e);
@@ -63,18 +61,33 @@ public class P2PServer {
     }
 
     private void handleClient(Socket socket) {
+        String clientAddress = socket.getInetAddress().getHostAddress();
+
         try (ObjectInputStream ois = new ObjectInputStream(socket.getInputStream())) {
 
             P2PMessage message = (P2PMessage) ois.readObject();
 
-            // ⭐ FIX QUAN TRỌNG: Lưu IP + PORT của peer gửi
-            message.setSourceIp(socket.getInetAddress().getHostAddress());
-            message.setSourcePort(socket.getPort());
+            // ✅ CRITICAL FIX: Set source IP from socket
+            message.setSourceIp(clientAddress);
+
+            // ✅ CRITICAL FIX: Use sourcePort from message (sender's P2P server port)
+            // NOT socket.getPort() which is a random client port!
+            // The sender should have set this before sending
+
+            // If sourcePort not set, we can't auto-discover the peer
+            // This is why we need to fetch from RMI server instead
+
+            if (message.getSourcePort() == 0) {
+                // Port not set - will need to fetch from server
+                System.out.println("⚠️ Received message without sourcePort, will need RMI lookup");
+            } else {
+                System.out.println("✅ Received message from " + clientAddress + ":" + message.getSourcePort());
+            }
 
             messageHandler.handleMessage(message, socket);
 
         } catch (Exception e) {
-            System.err.println("Error handling client: " + e.getMessage());
+            System.err.println("❌ Error handling client from " + clientAddress + ": " + e.getMessage());
         } finally {
             try {
                 socket.close();
@@ -84,7 +97,6 @@ public class P2PServer {
         }
     }
 
-
     public void stop() {
         running = false;
         try {
@@ -92,12 +104,17 @@ public class P2PServer {
                 serverSocket.close();
             }
             executorService.shutdown();
+            System.out.println("✅ P2P Server stopped");
         } catch (IOException e) {
-            System.err.println("Error stopping P2P server: " + e.getMessage());
+            System.err.println("❌ Error stopping P2P server: " + e.getMessage());
         }
     }
 
     public int getPort() {
         return port;
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 }

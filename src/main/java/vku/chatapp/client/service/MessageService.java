@@ -1,10 +1,8 @@
-// FILE: vku/chatapp/client/service/MessageService.java
-// ✅ FIX: Always fetch fresh peer info before sending messages
-
 package vku.chatapp.client.service;
 
 import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
+import vku.chatapp.client.p2p.P2PServer;
 import vku.chatapp.client.p2p.PeerRegistry;
 import vku.chatapp.client.rmi.RMIClient;
 import vku.chatapp.common.dto.PeerInfo;
@@ -16,27 +14,27 @@ import java.util.UUID;
 
 public class MessageService {
     private final P2PClient p2pClient;
+    private P2PServer localP2PServer; // ✅ Store reference to local server
 
     public MessageService() {
         this.p2pClient = new P2PClient();
     }
 
-    /**
-     * ✅ FIXED: Fetch fresh peer info before sending text message
-     */
+    // ✅ NEW: Set local P2P server reference
+    public void setLocalP2PServer(P2PServer server) {
+        this.localP2PServer = server;
+    }
+
     public boolean sendTextMessage(Long receiverId, String content) {
         try {
-            // ✅ Get fresh peer info from server
             PeerInfo peerInfo = fetchFreshPeerInfo(receiverId);
             if (peerInfo == null) {
                 System.err.println("❌ Receiver not online: " + receiverId);
                 return false;
             }
 
-            // ✅ Update local registry
             PeerRegistry.getInstance().addPeer(peerInfo);
 
-            // ✅ Send message
             Long senderId = UserSession.getInstance().getCurrentUser().getId();
 
             P2PMessage message = new P2PMessage(
@@ -47,6 +45,11 @@ public class MessageService {
             message.setMessageId(UUID.randomUUID().toString());
             message.setContent(content);
             message.setContentType(MessageType.TEXT);
+
+            // ✅ Set source port for auto-discovery
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
 
             System.out.println("📤 Sending message from " + senderId + " to " + receiverId);
             System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
@@ -63,18 +66,14 @@ public class MessageService {
         }
     }
 
-    /**
-     * ✅ FIXED: Fetch fresh peer info before sending typing indicator
-     */
     public void sendTypingIndicator(Long receiverId, boolean isTyping) {
         try {
-            // ✅ Get peer info (use cached if available, else fetch)
             PeerInfo peerInfo = PeerRegistry.getInstance().getPeerInfo(receiverId);
 
             if (peerInfo == null) {
                 peerInfo = fetchFreshPeerInfo(receiverId);
                 if (peerInfo == null) {
-                    return; // Silently fail for typing indicator
+                    return;
                 }
                 PeerRegistry.getInstance().addPeer(peerInfo);
             }
@@ -88,6 +87,10 @@ public class MessageService {
             );
             message.setContent(String.valueOf(isTyping));
 
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
+
             p2pClient.sendMessageAsync(
                     peerInfo.getAddress(),
                     peerInfo.getPort(),
@@ -99,9 +102,6 @@ public class MessageService {
         }
     }
 
-    /**
-     * ✅ FIXED: Fetch fresh peer info before sending read receipt
-     */
     public void sendReadReceipt(Long senderId, String messageId) {
         try {
             PeerInfo peerInfo = PeerRegistry.getInstance().getPeerInfo(senderId);
@@ -109,7 +109,7 @@ public class MessageService {
             if (peerInfo == null) {
                 peerInfo = fetchFreshPeerInfo(senderId);
                 if (peerInfo == null) {
-                    return; // Silently fail
+                    return;
                 }
                 PeerRegistry.getInstance().addPeer(peerInfo);
             }
@@ -123,6 +123,10 @@ public class MessageService {
             );
             message.setMessageId(messageId);
 
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
+
             p2pClient.sendMessageAsync(
                     peerInfo.getAddress(),
                     peerInfo.getPort(),
@@ -134,9 +138,6 @@ public class MessageService {
         }
     }
 
-    /**
-     * ✅ NEW: Fetch fresh peer info from RMI server
-     */
     private PeerInfo fetchFreshPeerInfo(Long userId) {
         try {
             PeerInfo peerInfo = RMIClient.getInstance()

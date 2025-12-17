@@ -1,10 +1,8 @@
-// FILE: vku/chatapp/client/service/CallService.java
-// ✅ FIX: Always get fresh peer info before sending call messages
-
 package vku.chatapp.client.service;
 
 import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
+import vku.chatapp.client.p2p.P2PServer;
 import vku.chatapp.client.p2p.PeerRegistry;
 import vku.chatapp.client.rmi.RMIClient;
 import vku.chatapp.common.dto.PeerInfo;
@@ -16,27 +14,27 @@ import java.util.UUID;
 
 public class CallService {
     private final P2PClient p2pClient;
+    private P2PServer localP2PServer; // ✅ Store reference to local server
 
     public CallService() {
         this.p2pClient = new P2PClient();
     }
 
-    /**
-     * ✅ FIXED: Refresh peer info before initiating call
-     */
+    // ✅ NEW: Set local P2P server reference
+    public void setLocalP2PServer(P2PServer server) {
+        this.localP2PServer = server;
+    }
+
     public boolean initiateCall(Long receiverId, CallType callType) {
         try {
-            // ✅ STEP 1: Get fresh peer info from server
             PeerInfo peerInfo = fetchFreshPeerInfo(receiverId);
             if (peerInfo == null) {
                 System.err.println("❌ Peer not found or offline: " + receiverId);
                 return false;
             }
 
-            // ✅ STEP 2: Update local registry
             PeerRegistry.getInstance().addPeer(peerInfo);
 
-            // ✅ STEP 3: Create and send CALL_OFFER
             Long senderId = UserSession.getInstance().getCurrentUser().getId();
             String callId = UUID.randomUUID().toString();
 
@@ -47,6 +45,11 @@ public class CallService {
             );
             message.setMessageId(callId);
             message.setContent(callType.name());
+
+            // ✅ Set source port for auto-discovery
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
 
             System.out.println("📞 Initiating " + callType + " call to " + receiverId);
             System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
@@ -64,22 +67,16 @@ public class CallService {
         }
     }
 
-    /**
-     * ✅ FIXED: Refresh peer info before answering
-     */
     public boolean answerCall(Long callerId, String callId) {
         try {
-            // ✅ STEP 1: Get fresh peer info from server
             PeerInfo peerInfo = fetchFreshPeerInfo(callerId);
             if (peerInfo == null) {
                 System.err.println("❌ Caller peer not found: " + callerId);
                 return false;
             }
 
-            // ✅ STEP 2: Update local registry
             PeerRegistry.getInstance().addPeer(peerInfo);
 
-            // ✅ STEP 3: Send CALL_ANSWER
             Long answerId = UserSession.getInstance().getCurrentUser().getId();
 
             P2PMessage message = new P2PMessage(
@@ -89,6 +86,10 @@ public class CallService {
             );
             message.setMessageId(callId);
             message.setContent("ACCEPTED");
+
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
 
             System.out.println("✅ Answering call from " + callerId);
             System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
@@ -106,15 +107,10 @@ public class CallService {
         }
     }
 
-    /**
-     * ✅ FIXED: Refresh peer info before ending call
-     */
     public boolean endCall(Long peerId, String callId) {
         try {
-            // ✅ STEP 1: Try to get peer info (may fail if peer already disconnected)
             PeerInfo peerInfo = PeerRegistry.getInstance().getPeerInfo(peerId);
 
-            // ✅ If not in registry, try to fetch from server
             if (peerInfo == null) {
                 System.out.println("⚠️ Peer not in registry, fetching from server...");
                 peerInfo = fetchFreshPeerInfo(peerId);
@@ -125,7 +121,6 @@ public class CallService {
                 return false;
             }
 
-            // ✅ STEP 2: Send CALL_END
             Long senderId = UserSession.getInstance().getCurrentUser().getId();
 
             P2PMessage message = new P2PMessage(
@@ -135,6 +130,10 @@ public class CallService {
             );
             message.setMessageId(callId);
             message.setContent("ENDED");
+
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
 
             System.out.println("📤 Sent CALL_END message");
             System.out.println("   Address: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
@@ -169,6 +168,11 @@ public class CallService {
             );
             message.setMessageId(callId);
             message.setContent("REJECTED");
+
+            if (localP2PServer != null) {
+                message.setSourcePort(localP2PServer.getPort());
+            }
+
             System.out.println("❌ Rejecting call from " + callerId);
 
             return p2pClient.sendMessage(
@@ -183,9 +187,6 @@ public class CallService {
         }
     }
 
-    /**
-     * ✅ NEW: Fetch fresh peer info from RMI server
-     */
     private PeerInfo fetchFreshPeerInfo(Long userId) {
         try {
             PeerInfo peerInfo = RMIClient.getInstance()

@@ -18,6 +18,7 @@ import vku.chatapp.client.model.CallSession;
 import vku.chatapp.client.model.ChatSession;
 import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PMessageHandler;
+import vku.chatapp.client.p2p.P2PServer;
 import vku.chatapp.client.service.FileTransferService;
 import vku.chatapp.client.service.MessageService;
 import vku.chatapp.client.rmi.RMIClient;
@@ -54,6 +55,7 @@ public class ChatController extends BaseController {
     private DateTimeFormatter timeFormatter;
     private Set<String> displayedMessageIds;
     private boolean isSending = false;
+    private P2PServer localP2PServer;
 
     @FXML
     public void initialize() {
@@ -155,7 +157,6 @@ public class ChatController extends BaseController {
         initiateCall(friend, CallType.VIDEO);
     }
 
-    // ✅ NEW: Open call window
     private void initiateCall(UserDTO friend, CallType callType) {
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/video-call.fxml"));
@@ -167,23 +168,21 @@ public class ChatController extends BaseController {
             Stage callStage = new Stage();
             callController.setStage(callStage);
 
-            Scene scene = new Scene(callView, 800, 600);
+            Scene scene = new Scene(callView, 1000, 750);
 
-            // Add CSS if available
             try {
                 scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
             } catch (Exception e) {
                 System.out.println("⚠️ CSS not found, using default styles");
             }
 
-            callStage.setTitle((callType == CallType.VIDEO ? "Video" : "Audio") +
+            callStage.setTitle("📞 " + (callType == CallType.VIDEO ? "Video" : "Audio") +
                     " Call - " + friend.getDisplayName());
             callStage.setScene(scene);
+            callStage.setResizable(false); // ✅ Fix window size
             callStage.initModality(Modality.NONE);
-            callStage.setResizable(true);
             callStage.show();
 
-            // Initiate the call
             callController.initiateCall(friend, callType);
 
             System.out.println("✅ Call window opened");
@@ -659,5 +658,19 @@ public class ChatController extends BaseController {
         if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
         if (bytes < 1024 * 1024 * 1024) return String.format("%.1f MB", bytes / (1024.0 * 1024));
         return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
+    }
+
+    public void setLocalP2PServer(P2PServer server) {
+        this.localP2PServer = server;
+
+        // Update MessageService
+        if (messageService != null) {
+            messageService.setLocalP2PServer(server);
+        }
+
+        // Update FileTransferService if needed
+        if (fileTransferService != null) {
+            // fileTransferService.setLocalP2PServer(server);
+        }
     }
 }

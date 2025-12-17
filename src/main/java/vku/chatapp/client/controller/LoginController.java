@@ -1,5 +1,5 @@
 // FILE: vku/chatapp/client/controller/LoginController.java
-// ✅ FIX: Thêm cập nhật status ONLINE sau khi login
+// ✅ OPTIMIZED: Async status update, faster login
 
 package vku.chatapp.client.controller;
 
@@ -64,22 +64,19 @@ public class LoginController extends BaseController {
                     UserSession.getInstance().setCurrentUser(response.getUser());
                     UserSession.getInstance().setSessionToken(response.getSessionToken());
 
-                    // ✅ FIX 1: CẬP NHẬT STATUS THÀNH ONLINE
-                    try {
-                        boolean statusUpdated = RMIClient.getInstance()
-                                .getUserService()
-                                .updateStatus(response.getUser().getId(), UserStatus.ONLINE);
-
-                        if (statusUpdated) {
+                    // ✅ OPTIMIZED: Update status ASYNC (non-blocking)
+                    new Thread(() -> {
+                        try {
+                            RMIClient.getInstance()
+                                    .getUserService()
+                                    .updateStatus(response.getUser().getId(), UserStatus.ONLINE);
                             System.out.println("✅ User status updated to ONLINE");
-                        } else {
-                            System.err.println("⚠️ Failed to update user status");
+                        } catch (Exception e) {
+                            System.err.println("⚠️ Failed to update status: " + e.getMessage());
                         }
-                    } catch (Exception e) {
-                        System.err.println("❌ Error updating status: " + e.getMessage());
-                    }
+                    }).start();
 
-                    // Get stage from current scene
+                    // Switch scene immediately without waiting
                     if (stage == null) {
                         stage = (Stage) emailField.getScene().getWindow();
                     }
@@ -99,109 +96,12 @@ public class LoginController extends BaseController {
         switchScene("/view/register.fxml", 1200, 800);
     }
 
-//    @FXML
-//    private void handleForgotPassword(ActionEvent event) {
-//        if (stage == null) {
-//            stage = getStageFromEvent(event);
-//        }
-//
-//        TextInputDialog dialog = new TextInputDialog();
-//        dialog.setTitle("Forgot Password");
-//        dialog.setHeaderText("Reset Password");
-//        dialog.setContentText("Enter your email address:");
-//
-//        dialog.showAndWait().ifPresent(email -> {
-//            if (email.isEmpty()) {
-//                showError("Error", "Please enter your email address");
-//                return;
-//            }
-//
-//            new Thread(() -> {
-//                boolean success = authService.sendPasswordResetOtp(email);
-//
-//                javafx.application.Platform.runLater(() -> {
-//                    if (success) {
-//                        showResetPasswordDialog(email);
-//                    } else {
-//                        showError("Error", "Failed to send reset code. Please check your email address.");
-//                    }
-//                });
-//            }).start();
-//        });
-//    }
-//
-//    private void showResetPasswordDialog(String email) {
-//        Dialog<ButtonType> dialog = new Dialog<>();
-//        dialog.setTitle("Reset Password");
-//        dialog.setHeaderText("Enter reset code and new password");
-//
-//        GridPane grid = new GridPane();
-//        grid.setHgap(10);
-//        grid.setVgap(10);
-//        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
-//
-//        TextField otpField = new TextField();
-//        otpField.setPromptText("6-digit code");
-//        PasswordField newPasswordField = new PasswordField();
-//        newPasswordField.setPromptText("New password");
-//        PasswordField confirmPasswordField = new PasswordField();
-//        confirmPasswordField.setPromptText("Confirm password");
-//
-//        grid.add(new Label("Email:"), 0, 0);
-//        grid.add(new Label(email), 1, 0);
-//        grid.add(new Label("Reset Code:"), 0, 1);
-//        grid.add(otpField, 1, 1);
-//        grid.add(new Label("New Password:"), 0, 2);
-//        grid.add(newPasswordField, 1, 2);
-//        grid.add(new Label("Confirm:"), 0, 3);
-//        grid.add(confirmPasswordField, 1, 3);
-//
-//        dialog.getDialogPane().setContent(grid);
-//        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-//
-//        dialog.showAndWait().ifPresent(response -> {
-//            if (response == ButtonType.OK) {
-//                String otp = otpField.getText().trim();
-//                String newPassword = newPasswordField.getText();
-//                String confirmPassword = confirmPasswordField.getText();
-//
-//                if (otp.isEmpty() || newPassword.isEmpty()) {
-//                    showError("Error", "Please fill in all fields");
-//                    return;
-//                }
-//
-//                if (!newPassword.equals(confirmPassword)) {
-//                    showError("Error", "Passwords do not match");
-//                    return;
-//                }
-//
-//                if (newPassword.length() < 6) {
-//                    showError("Error", "Password must be at least 6 characters");
-//                    return;
-//                }
-//
-//                new Thread(() -> {
-//                    boolean success = authService.resetPassword(email, otp, newPassword);
-//
-//                    javafx.application.Platform.runLater(() -> {
-//                        if (success) {
-//                            showInfo("Success", "Password reset successfully! You can now login.");
-//                        } else {
-//                            showError("Error", "Failed to reset password. Invalid code or expired.");
-//                        }
-//                    });
-//                }).start();
-//            }
-//        });
-//    }
-
     @FXML
     private void handleForgotPassword(ActionEvent event) {
         if (stage == null) {
             stage = getStageFromEvent(event);
         }
 
-        // Hiển thị dialog nhập email
         TextInputDialog dialog = new TextInputDialog();
         dialog.setTitle("Quên Mật Khẩu");
         dialog.setHeaderText("Đặt lại mật khẩu");
@@ -213,13 +113,11 @@ public class LoginController extends BaseController {
                 return;
             }
 
-            // Validate email format
             if (!email.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
                 showError("Lỗi", "Email không hợp lệ");
                 return;
             }
 
-            // Hiển thị loading
             Alert loadingAlert = new Alert(Alert.AlertType.INFORMATION);
             loadingAlert.setTitle("Đang xử lý");
             loadingAlert.setHeaderText("Đang gửi mã OTP...");
@@ -233,12 +131,10 @@ public class LoginController extends BaseController {
                     loadingAlert.close();
 
                     if (success) {
-                        // ✅ Chuyển sang màn hình reset-password
                         try {
                             FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/reset-password.fxml"));
                             Parent root = loader.load();
 
-                            // Truyền email sang controller mới
                             ResetPasswordController controller = loader.getController();
                             controller.setEmail(email);
                             controller.setStage(stage);

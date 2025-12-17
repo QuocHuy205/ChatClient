@@ -1,7 +1,6 @@
 package vku.chatapp.common.protocol;
 
 import vku.chatapp.common.enums.MessageType;
-
 import java.io.Serializable;
 
 public class P2PMessage implements Serializable {
@@ -17,7 +16,7 @@ public class P2PMessage implements Serializable {
     private String fileName;
     private long timestamp;
 
-    // ⭐ QUAN TRỌNG: để peer nhận tự động ghi nhớ IP/PORT bên gửi
+    // ✅ NEW: Source IP and Port (for peer auto-discovery)
     private String sourceIp;
     private int sourcePort;
 
@@ -32,6 +31,7 @@ public class P2PMessage implements Serializable {
         this.receiverId = receiverId;
     }
 
+    // Getters and Setters
     public String getMessageId() { return messageId; }
     public void setMessageId(String messageId) { this.messageId = messageId; }
 
@@ -59,7 +59,7 @@ public class P2PMessage implements Serializable {
     public long getTimestamp() { return timestamp; }
     public void setTimestamp(long timestamp) { this.timestamp = timestamp; }
 
-    // ⭐ NEW: GETTER + SETTER CHO source IP/PORT
+    // ✅ NEW: Source IP/Port getters and setters
     public String getSourceIp() { return sourceIp; }
     public void setSourceIp(String sourceIp) { this.sourceIp = sourceIp; }
 

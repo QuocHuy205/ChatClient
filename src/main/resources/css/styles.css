@@ -585,3 +585,37 @@
 .status-busy {
     -fx-text-fill: #d13438;
 }
+
+
+/* Video Call Styles */
+
+#callContainer {
+    -fx-background-color: #000000;
+}
+
+#remoteVideoView {
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);
+}
+
+#localVideoView {
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 5, 0, 0, 0);
+}
+
+#remoteVideoPlaceholder {
+    -fx-font-family: "Arial";
+    -fx-font-weight: bold;
+}
+
+/* Buttons */
+.button {
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-opacity: 0.8;
+}
+
+.button:pressed {
+    -fx-scale-x: 0.95;
+    -fx-scale-y: 0.95;
+}
