@@ -10,6 +10,7 @@ public class UserDTO implements Serializable {
     private Long id;
     private String username;
     private String displayName;
+    private String Email;
     private String avatarUrl;
     private String bio;
     private UserStatus status;
@@ -24,6 +25,9 @@ public class UserDTO implements Serializable {
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
+
+    public String getEmail() { return Email; }
+    public void setEmail(String email) { Email = email; }
 
     public String getDisplayName() { return displayName; }
     public void setDisplayName(String displayName) { this.displayName = displayName; }

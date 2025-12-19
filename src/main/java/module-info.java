@@ -5,6 +5,8 @@ module vku.chatapp {
     requires java.desktop;
     requires java.prefs;
     requires jbcrypt;
-    requires javafx.swing;
+    requires javafx.graphics;
     requires org.bytedeco.javacv;
+
+
 }

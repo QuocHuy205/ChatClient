@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.shape.Circle?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:id="sidebarContainer"
+      fx:controller="vku.chatapp.client.controller.component.ProfileEditorController"
+      styleClass="profile-editor-container"
+      spacing="20"
+      prefWidth="600"
+      prefHeight="650">
+
+    <padding>
+        <Insets top="20" right="30" bottom="20" left="30"/>
+    </padding>
+
+    <!-- Header -->
+    <HBox alignment="CENTER_LEFT" spacing="10">
+        <Button fx:id="backButton" text="← Back" styleClass="back-button"/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Label text="Edit Profile" styleClass="profile-header-title"/>
+        <Region HBox.hgrow="ALWAYS"/>
+    </HBox>
+
+    <Separator/>
+
+    <!-- Avatar Section -->
+    <VBox alignment="CENTER" spacing="15" styleClass="avatar-section">
+        <StackPane>
+            <Circle radius="60" styleClass="avatar-circle-background"/>
+            <ImageView fx:id="avatarImageView"
+                       fitWidth="120"
+                       fitHeight="120"
+                       preserveRatio="true"
+                       styleClass="avatar-image">
+                <clip>
+                    <Circle radius="60"/>
+                </clip>
+            </ImageView>
+            <Button fx:id="changeAvatarButton"
+                    text="📷"
+                    styleClass="change-avatar-button"
+                    StackPane.alignment="BOTTOM_RIGHT"/>
+        </StackPane>
+
+        <Label fx:id="avatarSizeLabel"
+               text="Click to upload photo (max 5MB)"
+               styleClass="hint-label"/>
+    </VBox>
+
+    <Separator/>
+
+    <!-- Profile Form -->
+    <ScrollPane fitToWidth="true" VBox.vgrow="ALWAYS">
+        <VBox spacing="20">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+
+            <!-- Basic Information -->
+            <VBox spacing="15">
+                <Label text="Basic Information" styleClass="section-title"/>
+
+                <!-- Username (Read-only) -->
+                <VBox spacing="5">
+                    <Label text="Username" styleClass="field-label"/>
+                    <TextField fx:id="usernameField"
+                               editable="false"
+                               styleClass="readonly-field"/>
+                </VBox>
+
+                <!-- Display Name -->
+                <VBox spacing="5">
+                    <Label text="Display Name *" styleClass="field-label"/>
+                    <TextField fx:id="fullNameField"
+                               promptText="Enter your display name"/>
+                </VBox>
+
+                <!-- Email -->
+                <VBox spacing="5">
+                    <Label text="Email" styleClass="field-label"/>
+                    <TextField fx:id="emailField"
+                               promptText="Enter your email"/>
+                    <Label fx:id="emailErrorLabel"
+                           styleClass="error-label"
+                           visible="false"
+                           managed="false"/>
+                </VBox>
+
+                <!-- Bio -->
+                <VBox spacing="5">
+                    <Label text="Bio" styleClass="field-label"/>
+                    <TextArea fx:id="bioField"
+                              promptText="Tell us about yourself..."
+                              wrapText="true"
+                              prefRowCount="4"/>
+                    <Label fx:id="bioCharCountLabel"
+                           text="0 / 500"
+                           styleClass="hint-label"/>
+                </VBox>
+            </VBox>
+
+            <Separator/>
+
+            <!-- Password Change Section -->
+            <VBox spacing="15">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="Change Password" styleClass="section-title"/>
+                    <CheckBox fx:id="changePasswordCheckbox"
+                              text="Change password"/>
+                </HBox>
+
+                <VBox fx:id="passwordSection"
+                      spacing="10"
+                      visible="false"
+                      managed="false">
+
+                    <VBox spacing="5">
+                        <Label text="Current Password *" styleClass="field-label"/>
+                        <PasswordField fx:id="currentPasswordField"
+                                       promptText="Enter current password"/>
+                    </VBox>
+
+                    <VBox spacing="5">
+                        <Label text="New Password *" styleClass="field-label"/>
+                        <PasswordField fx:id="newPasswordField"
+                                       promptText="Enter new password (min 6 characters)"/>
+                    </VBox>
+
+                    <VBox spacing="5">
+                        <Label text="Confirm Password *" styleClass="field-label"/>
+                        <PasswordField fx:id="confirmPasswordField"
+                                       promptText="Confirm new password"/>
+                    </VBox>
+
+                    <Label fx:id="passwordErrorLabel"
+                           styleClass="error-label"
+                           visible="false"
+                           managed="false"/>
+
+                    <Label text="Note: Password change feature is coming soon"
+                           styleClass="hint-label"
+                           style="-fx-text-fill: #FF9800;"/>
+                </VBox>
+            </VBox>
+
+            <Separator/>
+
+            <!-- Status Section -->
+            <VBox spacing="10">
+                <Label text="Status" styleClass="section-title"/>
+                <HBox spacing="10" alignment="CENTER_LEFT">
+                    <Label text="Current Status:" styleClass="field-label"/>
+                    <ComboBox fx:id="statusComboBox"
+                              prefWidth="150"/>
+                </HBox>
+            </VBox>
+        </VBox>
+    </ScrollPane>
+
+    <!-- Action Buttons -->
+    <HBox spacing="15" alignment="CENTER">
+        <Button fx:id="saveButton"
+                text="Save Changes"
+                styleClass="primary-button"
+                prefWidth="150"/>
+        <Button fx:id="cancelButton"
+                text="Cancel"
+                styleClass="secondary-button"
+                prefWidth="150"/>
+    </HBox>
+
+    <!-- Loading Overlay -->
+    <StackPane fx:id="loadingOverlay"
+               visible="false"
+               managed="false"
+               style="-fx-background-color: rgba(0,0,0,0.5);"
+               StackPane.alignment="CENTER">
+        <VBox alignment="CENTER" spacing="10">
+            <ProgressIndicator/>
+            <Label text="Updating profile..."
+                   style="-fx-text-fill: white; -fx-font-size: 14px;"/>
+        </VBox>
+    </StackPane>
+
+</VBox>

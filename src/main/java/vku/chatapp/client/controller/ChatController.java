@@ -34,6 +34,7 @@ import java.io.File;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ChatController extends BaseController {
     @FXML private VBox messagesContainer;
@@ -56,6 +57,7 @@ public class ChatController extends BaseController {
     private Set<String> displayedMessageIds;
     private boolean isSending = false;
     private P2PServer localP2PServer;
+    private final AtomicBoolean isSending2 = new AtomicBoolean(false);
 
     @FXML
     public void initialize() {
@@ -232,27 +234,28 @@ public class ChatController extends BaseController {
 
     @FXML
     private void handleSendMessage() {
-        if (isSending) {
+
+        // 🔒 Chống double click / Enter + Click
+        if (!isSending2.compareAndSet(false, true)) {
             System.out.println("⚠️ Already sending message, ignoring...");
             return;
         }
 
         if (currentChatSession == null) {
             showError("No Chat Selected", "Please select a friend to chat with");
+            isSending2.set(false);
             return;
         }
 
         String content = messageInput.getText().trim();
-
         if (content.isEmpty()) {
-            System.out.println("⚠️ Empty message, not sending");
+            isSending2.set(false);
             return;
         }
 
         Long senderId = UserSession.getInstance().getCurrentUser().getId();
         Long receiverId = currentChatSession.getFriend().getId();
 
-        isSending = true;
         sendButton.setDisable(true);
 
         String messageToSend = content;
@@ -272,44 +275,35 @@ public class ChatController extends BaseController {
                         .getMessageService()
                         .saveMessage(message);
 
-                System.out.println("✅ Message saved to DB with ID: " + savedMessage.getId());
-
                 boolean p2pSuccess = messageService.sendTextMessage(receiverId, messageToSend);
 
-                if (p2pSuccess) {
-                    savedMessage.setStatus(MessageStatus.SENT);
-                    RMIClient.getInstance()
-                            .getMessageService()
-                            .updateMessageStatus(savedMessage.getId(), MessageStatus.SENT.name());
-                } else {
-                    savedMessage.setStatus(MessageStatus.FAILED);
-                    RMIClient.getInstance()
-                            .getMessageService()
-                            .updateMessageStatus(savedMessage.getId(), MessageStatus.FAILED.name());
-                }
+                MessageStatus finalStatus = p2pSuccess
+                        ? MessageStatus.SENT
+                        : MessageStatus.FAILED;
+
+                RMIClient.getInstance()
+                        .getMessageService()
+                        .updateMessageStatus(savedMessage.getId(), finalStatus.name());
+
+                savedMessage.setStatus(finalStatus);
 
                 Platform.runLater(() -> {
                     currentChatSession.addMessage(savedMessage);
                     displayMessage(savedMessage, false);
 
                     if (!p2pSuccess) {
-                        showError("Send Failed", "Could not send message. User may be offline.\nMessage saved to database.");
+                        showError("Send Failed", "User may be offline. Message saved.");
                     }
-
-                    isSending = false;
-                    sendButton.setDisable(false);
-
-                    System.out.println("✅ Message processed successfully");
                 });
 
             } catch (Exception e) {
-                System.err.println("❌ Error sending message: " + e.getMessage());
-                e.printStackTrace();
-
                 Platform.runLater(() -> {
-                    showError("Send Failed", "Error: " + e.getMessage());
+                    showError("Send Failed", e.getMessage());
                     messageInput.setText(messageToSend);
-                    isSending = false;
+                });
+            } finally {
+                Platform.runLater(() -> {
+                    isSending2.set(false);
                     sendButton.setDisable(false);
                 });
             }
