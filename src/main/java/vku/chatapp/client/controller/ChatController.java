@@ -10,10 +10,16 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextArea;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import vku.chatapp.client.model.CallSession;
 import vku.chatapp.client.model.ChatSession;
 import vku.chatapp.client.model.UserSession;
@@ -30,10 +36,15 @@ import vku.chatapp.common.model.Message;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 
+import java.awt.*;
 import java.io.File;
+import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ChatController extends BaseController {
@@ -116,11 +127,21 @@ public class ChatController extends BaseController {
 
         chatTitleLabel.setText(friend.getDisplayName() != null ? friend.getDisplayName() : "Friend");
 
-        if (friend.getStatus() != null) {
-            chatStatusLabel.setText(friend.getStatus().toString());
-        } else {
-            chatStatusLabel.setText("Online");
-        }
+        new Thread(() -> {
+            try {
+                UserDTO freshUser = RMIClient.getInstance()
+                        .getUserService()
+                        .getUserById(friendId);
+
+                Platform.runLater(() -> updateChatStatus(freshUser));
+
+            } catch (Exception e) {
+                Platform.runLater(() -> {
+                    chatStatusLabel.setText("Offline");
+                    chatStatusLabel.setStyle("-fx-text-fill: gray;");
+                });
+            }
+        }).start();
 
         // ✅ Enable call buttons
         if (audioCallButton != null) audioCallButton.setDisable(false);
@@ -291,9 +312,6 @@ public class ChatController extends BaseController {
                     currentChatSession.addMessage(savedMessage);
                     displayMessage(savedMessage, false);
 
-                    if (!p2pSuccess) {
-                        showError("Send Failed", "User may be offline. Message saved.");
-                    }
                 });
 
             } catch (Exception e) {
@@ -318,7 +336,16 @@ public class ChatController extends BaseController {
         }
 
         FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("Select File to Send");
+        fileChooser.setTitle("Select File or Image to Send");
+
+        // ✅ Add file filters
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("All Files", "*.*"),
+                new FileChooser.ExtensionFilter("Images", "*.jpg", "*.jpeg", "*.png", "*.gif", "*.bmp"),
+                new FileChooser.ExtensionFilter("Documents", "*.pdf", "*.doc", "*.docx", "*.txt"),
+                new FileChooser.ExtensionFilter("Archives", "*.zip", "*.rar", "*.7z")
+        );
+
         File file = fileChooser.showOpenDialog(stage);
 
         if (file != null) {
@@ -330,6 +357,11 @@ public class ChatController extends BaseController {
         Long senderId = UserSession.getInstance().getCurrentUser().getId();
         Long receiverId = currentChatSession.getFriend().getId();
 
+        // ✅ Detect message type
+        MessageType messageType = FileTransferService.isImage(file.getName())
+                ? MessageType.IMAGE
+                : MessageType.FILE;
+
         new Thread(() -> {
             try {
                 Message message = new Message();
@@ -337,16 +369,27 @@ public class ChatController extends BaseController {
                 message.setReceiverId(receiverId);
                 message.setFileName(file.getName());
                 message.setFileSize(file.length());
-                message.setType(MessageType.FILE);
+                message.setType(messageType);
                 message.setStatus(MessageStatus.SENDING);
                 message.setSentAt(LocalDateTime.now());
-                message.setContent("📎 " + file.getName());
+
+                // ✅ Different content for images vs files
+                if (messageType == MessageType.IMAGE) {
+                    message.setContent("🖼️ " + file.getName());
+                } else {
+                    message.setContent("📎 " + file.getName());
+                }
+                // ✅ COPY IMAGE TO CACHE FOR DISPLAY
+                if (messageType == MessageType.IMAGE) {
+                    fileTransferService.cacheImage(file);
+                }
+
 
                 Message savedMessage = RMIClient.getInstance()
                         .getMessageService()
                         .saveMessage(message);
 
-                System.out.println("✅ File message saved to DB with ID: " + savedMessage.getId());
+                System.out.println("✅ " + messageType + " message saved to DB with ID: " + savedMessage.getId());
 
                 boolean success = fileTransferService.sendFile(receiverId, file);
 
@@ -366,10 +409,12 @@ public class ChatController extends BaseController {
                     currentChatSession.addMessage(savedMessage);
                     displayMessage(savedMessage, false);
 
-                    if (success) {
-                        showInfo("File Sent", "File sent successfully: " + file.getName());
-                    } else {
-                        showError("Send Failed", "Could not send file. Message saved to database.");
+                    if (!success) {
+//                        showInfo(messageType + " Sent",
+//                                messageType + " sent successfully: " + file.getName());
+//                    } else {
+                        showError("Send Failed",
+                                "Could not send " + messageType.toString().toLowerCase() + ". Message saved to database.");
                     }
                 });
 
@@ -503,6 +548,10 @@ public class ChatController extends BaseController {
             ChatSession session = chatSessions.get(senderId);
             fileTransferService.receiveFile(p2pMessage);
 
+            MessageType messageType = p2pMessage.getContentType() != null
+                    ? p2pMessage.getContentType()
+                    : MessageType.FILE;
+
             new Thread(() -> {
                 try {
                     Message message = new Message();
@@ -510,10 +559,15 @@ public class ChatController extends BaseController {
                     message.setReceiverId(UserSession.getInstance().getCurrentUser().getId());
                     message.setFileName(p2pMessage.getFileName());
                     message.setFileSize((long) p2pMessage.getFileData().length);
-                    message.setType(MessageType.FILE);
+                    message.setType(messageType);
                     message.setStatus(MessageStatus.DELIVERED);
                     message.setSentAt(LocalDateTime.now());
-                    message.setContent("📎 " + p2pMessage.getFileName());
+
+                    if (messageType == MessageType.IMAGE) {
+                        message.setContent("🖼️ " + p2pMessage.getFileName());
+                    } else {
+                        message.setContent("📎 " + p2pMessage.getFileName());
+                    }
 
                     Message savedMessage = RMIClient.getInstance()
                             .getMessageService()
@@ -527,12 +581,13 @@ public class ChatController extends BaseController {
                             displayMessage(savedMessage, false);
                         }
 
-                        String downloadPath = System.getProperty("user.home") + "/Downloads/VKUChat/";
-                        showInfo("File Received",
-                                "File received: " + p2pMessage.getFileName() +
-                                        "\nSaved to: " + downloadPath);
+                        String savePath = messageType == MessageType.IMAGE
+                                ? fileTransferService.getImageCachePath()
+                                : fileTransferService.getDownloadPath();
 
-                        System.out.println("✅ File transfer saved and displayed");
+//                        showInfo(messageType + " Received",
+//                                messageType + " received: " + p2pMessage.getFileName() +
+//                                        "\nSaved to: " + savePath);
                     });
 
                 } catch (Exception e) {
@@ -542,10 +597,12 @@ public class ChatController extends BaseController {
         });
     }
 
+    /**
+     * ✅ ENHANCED: Display message with image preview and download button
+     */
     private void displayMessage(Message message, boolean addToSession) {
         if (message.getContent() == null || message.getContent().trim().isEmpty()) {
-            if (message.getType() != MessageType.FILE) {
-                System.out.println("⚠️ Skipping empty message display");
+            if (message.getType() != MessageType.FILE && message.getType() != MessageType.IMAGE) {
                 return;
             }
         }
@@ -556,7 +613,6 @@ public class ChatController extends BaseController {
                 message.getSentAt();
 
         if (displayedMessageIds.contains(messageId)) {
-            System.out.println("⚠️ Message already displayed, skipping");
             return;
         }
 
@@ -580,6 +636,7 @@ public class ChatController extends BaseController {
                         "-fx-background-radius: 18px;"
         );
 
+        // ✅ TEXT MESSAGE
         if (message.getType() == MessageType.TEXT) {
             Label contentLabel = new Label(message.getContent());
             contentLabel.setWrapText(true);
@@ -589,27 +646,19 @@ public class ChatController extends BaseController {
                             "-fx-font-size: 14px;"
             );
             bubble.getChildren().add(contentLabel);
-
-        } else if (message.getType() == MessageType.FILE) {
-            Label fileLabel = new Label("📎 " + message.getFileName());
-            fileLabel.setStyle(
-                    "-fx-text-fill: " + (isSent ? "white" : "#323130") + ";" +
-                            "-fx-font-size: 14px;" +
-                            "-fx-font-weight: bold;"
-            );
-
-            if (message.getFileSize() != null) {
-                Label sizeLabel = new Label(formatFileSize(message.getFileSize()));
-                sizeLabel.setStyle(
-                        "-fx-text-fill: " + (isSent ? "rgba(255,255,255,0.8)" : "#605e5c") + ";" +
-                                "-fx-font-size: 11px;"
-                );
-                bubble.getChildren().addAll(fileLabel, sizeLabel);
-            } else {
-                bubble.getChildren().add(fileLabel);
-            }
+        }
+        // ✅ IMAGE MESSAGE - Display inline
+        else if (message.getType() == MessageType.IMAGE) {
+            VBox imageContainer = createImageBubble(message, isSent);
+            bubble.getChildren().add(imageContainer);
+        }
+        // ✅ FILE MESSAGE - Show download button
+        else if (message.getType() == MessageType.FILE) {
+            VBox fileContainer = createFileBubbleWithOpen(message, isSent);
+            bubble.getChildren().add(fileContainer);
         }
 
+        // ✅ Status box (time + status icon)
         HBox statusBox = new HBox(5);
         statusBox.setAlignment(Pos.CENTER_RIGHT);
 
@@ -647,6 +696,314 @@ public class ChatController extends BaseController {
         messagesContainer.getChildren().add(messageBox);
     }
 
+    /**
+     * ✅ Create image bubble with inline preview (click to view full size)
+     */
+    private VBox createImageBubble(Message message, boolean isSent) {
+        VBox container = new VBox(8);
+        container.setAlignment(Pos.CENTER_LEFT);
+
+        try {
+            File imageFile = new File(
+                    fileTransferService.getImageCachePath(),
+                    message.getFileName()
+            );
+
+            if (!imageFile.exists()) {
+                imageFile = new File(
+                        fileTransferService.getDownloadPath(),
+                        message.getFileName()
+                );
+            }
+
+            if (!imageFile.exists()) {
+                throw new RuntimeException("Image file not found: " + message.getFileName());
+            }
+
+            Image image = new Image(imageFile.toURI().toString(), true);
+            ImageView imageView = new ImageView(image);
+
+            imageView.setFitWidth(280);
+            imageView.setPreserveRatio(true);
+            imageView.setSmooth(true);
+
+            File finalImageFile = imageFile;
+            imageView.setOnMouseClicked(e -> {
+                try {
+                    Desktop.getDesktop().open(finalImageFile);
+                } catch (Exception ex) {
+                    showError("Open Error", ex.getMessage());
+                }
+            });
+
+            container.getChildren().add(imageView);
+
+//            Label name = new Label(message.getFileName());
+//            name.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
+//            container.getChildren().add(name);
+
+        } catch (Exception e) {
+            Label error = new Label("🖼️ Image not available");
+            error.setStyle("-fx-text-fill: red;");
+            container.getChildren().add(error);
+        }
+
+        return container;
+    }
+    /**
+     * ✅ Create file bubble with Open button
+     */
+    private VBox createFileBubbleWithOpen(Message message, boolean isSent) {
+        VBox container = new VBox(8);
+
+        String fileIcon = getFileIcon(message.getFileName());
+
+        // File info
+        HBox fileInfoBox = new HBox(8);
+        fileInfoBox.setAlignment(Pos.CENTER_LEFT);
+
+        Label iconLabel = new Label(fileIcon);
+        iconLabel.setStyle("-fx-font-size: 24px;");
+
+        VBox fileDetails = new VBox(2);
+
+        Label fileNameLabel = new Label(message.getFileName());
+        fileNameLabel.setStyle(
+                "-fx-text-fill: " + (isSent ? "white" : "#323130") + ";" +
+                        "-fx-font-size: 13px;" +
+                        "-fx-font-weight: bold;"
+        );
+        fileNameLabel.setWrapText(true);
+        fileNameLabel.setMaxWidth(250);
+
+        Label fileSizeLabel = new Label(
+                message.getFileSize() != null
+                        ? formatFileSize(message.getFileSize())
+                        : "Unknown size"
+        );
+        fileSizeLabel.setStyle(
+                "-fx-text-fill: " + (isSent ? "rgba(255,255,255,0.8)" : "#605e5c") + ";" +
+                        "-fx-font-size: 11px;"
+        );
+
+        fileDetails.getChildren().addAll(fileNameLabel, fileSizeLabel);
+        fileInfoBox.getChildren().addAll(iconLabel, fileDetails);
+
+        // ✅ OPEN button
+        Button openButton = new Button("📂 Open");
+        openButton.setStyle(
+                "-fx-background-color: " + (isSent ? "#005a9e" : "#0078d4") + ";" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-size: 12px;" +
+                        "-fx-padding: 6 18 6 18;" +
+                        "-fx-background-radius: 15px;" +
+                        "-fx-cursor: hand;"
+        );
+
+        openButton.setOnAction(e -> openFile(message));
+        // ✅ OPEN FOLDER button
+        Button openFolderButton = new Button("📂 Open Folder");
+        openFolderButton.setStyle(
+                "-fx-background-color: #5a5a5a;" +
+                        "-fx-text-fill: white;" +
+                        "-fx-font-size: 12px;" +
+                        "-fx-padding: 6 14 6 14;" +
+                        "-fx-background-radius: 15px;" +
+                        "-fx-cursor: hand;"
+        );
+        openFolderButton.setOnAction(e -> openFileLocation(message));
+
+// Button box
+        HBox buttonBox = new HBox(8, openButton, openFolderButton);
+        buttonBox.setAlignment(Pos.CENTER_LEFT);
+
+        container.getChildren().addAll(fileInfoBox, buttonBox);
+
+//        container.getChildren().addAll(fileInfoBox, openButton);
+
+        fileNameLabel.setOnMouseClicked(e -> {
+            if (e.getClickCount() == 2) {
+                openFileLocation(message);
+            }
+        });
+
+        return container;
+    }
+    /**
+     * ✅ Open file directly
+     */
+    private void openFile(Message message) {
+        try {
+            File file = new File(
+                    fileTransferService.getDownloadPath(),
+                    message.getFileName()
+            );
+
+            if (!file.exists()) {
+                showError("File Not Found",
+                        "File does not exist:\n" + file.getAbsolutePath());
+                return;
+            }
+
+            Desktop.getDesktop().open(file);
+
+        } catch (Exception e) {
+            showError("Open Error", "Could not open file: " + e.getMessage());
+        }
+    }
+
+    private void openFileLocation(Message message) {
+        try {
+            File file = new File(
+                    fileTransferService.getDownloadPath(),
+                    message.getFileName()
+            );
+
+            if (!file.exists()) {
+                showError("File Not Found",
+                        "File does not exist:\n" + file.getAbsolutePath());
+                return;
+            }
+
+            // Windows: open Explorer and select file
+            String command = "explorer /select,\"" + file.getAbsolutePath() + "\"";
+            Runtime.getRuntime().exec(command);
+
+        } catch (Exception e) {
+            showError("Open Folder Error", e.getMessage());
+        }
+    }
+
+
+    /**
+     * ✅ Download file to user's chosen location
+     */
+    private void downloadFile(Message message) {
+        try {
+            // Source file (from received files location)
+            File sourceFile = new File(fileTransferService.getDownloadPath() + message.getFileName());
+
+            if (!sourceFile.exists()) {
+                showError("File Not Found", "File has been moved or deleted: " + message.getFileName());
+                return;
+            }
+
+            // Let user choose save location
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Save File");
+            fileChooser.setInitialFileName(message.getFileName());
+
+            // Set initial directory to Downloads
+            File downloadsDir = new File(System.getProperty("user.home"), "Downloads");
+            if (downloadsDir.exists()) {
+                fileChooser.setInitialDirectory(downloadsDir);
+            }
+
+            File destinationFile = fileChooser.showSaveDialog(stage);
+
+            if (destinationFile != null) {
+                // Copy file to chosen location
+                Files.copy(
+                        sourceFile.toPath(),
+                        destinationFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING
+                );
+
+                showInfo("Download Complete",
+                        "File saved to: " + destinationFile.getAbsolutePath());
+
+                // Ask if user wants to open the file
+                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+                alert.setTitle("Open File");
+                alert.setHeaderText("File downloaded successfully!");
+                alert.setContentText("Do you want to open the file now?");
+
+                ButtonType buttonYes = new ButtonType("Yes");
+                ButtonType buttonNo = new ButtonType("No");
+                alert.getButtonTypes().setAll(buttonYes, buttonNo);
+
+                alert.showAndWait().ifPresent(response -> {
+                    if (response == buttonYes) {
+                        try {
+                            Desktop.getDesktop().open(destinationFile);
+                        } catch (Exception ex) {
+                            showError("Open Error", "Could not open file: " + ex.getMessage());
+                        }
+                    }
+                });
+            }
+
+        } catch (Exception e) {
+            System.err.println("❌ Error downloading file: " + e.getMessage());
+            e.printStackTrace();
+            showError("Download Error", "Failed to download file: " + e.getMessage());
+        }
+    }
+
+    /**
+     * ✅ Create file bubble with icon
+     */
+    private VBox createFileBubble(Message message, boolean isSent) {
+        VBox container = new VBox(5);
+
+        String fileIcon = getFileIcon(message.getFileName());
+
+        Label fileLabel = new Label(fileIcon + " " + message.getFileName());
+        fileLabel.setStyle(
+                "-fx-text-fill: " + (isSent ? "white" : "#323130") + ";" +
+                        "-fx-font-size: 14px;" +
+                        "-fx-font-weight: bold;"
+        );
+
+        if (message.getFileSize() != null) {
+            Label sizeLabel = new Label(formatFileSize(message.getFileSize()));
+            sizeLabel.setStyle(
+                    "-fx-text-fill: " + (isSent ? "rgba(255,255,255,0.8)" : "#605e5c") + ";" +
+                            "-fx-font-size: 11px;"
+            );
+            container.getChildren().addAll(fileLabel, sizeLabel);
+        } else {
+            container.getChildren().add(fileLabel);
+        }
+
+        // ✅ Click to open file
+        container.setOnMouseClicked(e -> {
+            File file = new File(fileTransferService.getDownloadPath() + message.getFileName());
+            if (file.exists()) {
+                try {
+                    Desktop.getDesktop().open(file);
+                } catch (Exception ex) {
+                    showError("Open Error", "Could not open file: " + ex.getMessage());
+                }
+            }
+        });
+
+        container.setStyle("-fx-cursor: hand;");
+
+        return container;
+    }
+
+    /**
+     * ✅ Get file icon based on extension
+     */
+    private String getFileIcon(String fileName) {
+        if (fileName == null) return "📎";
+
+        String ext = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+
+        return switch (ext) {
+            case "pdf" -> "📕";
+            case "doc", "docx" -> "📘";
+            case "xls", "xlsx" -> "📗";
+            case "ppt", "pptx" -> "📙";
+            case "zip", "rar", "7z" -> "📦";
+            case "txt" -> "📄";
+            case "mp3", "wav" -> "🎵";
+            case "mp4", "avi", "mkv" -> "🎬";
+            default -> "📎";
+        };
+    }
+
     private String formatFileSize(long bytes) {
         if (bytes < 1024) return bytes + " B";
         if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
@@ -662,9 +1019,28 @@ public class ChatController extends BaseController {
             messageService.setLocalP2PServer(server);
         }
 
-        // Update FileTransferService if needed
-        if (fileTransferService != null) {
-            // fileTransferService.setLocalP2PServer(server);
+    }
+    private void updateChatStatus(UserDTO user) {
+        if (user == null || user.getStatus() == null) {
+            chatStatusLabel.setText("Offline");
+            chatStatusLabel.setStyle("-fx-text-fill: gray;");
+            return;
+        }
+
+        switch (user.getStatus()) {
+            case ONLINE -> {
+                chatStatusLabel.setText("Online");
+                chatStatusLabel.setStyle("-fx-text-fill: #2ecc71;");
+            }
+            case OFFLINE -> {
+                chatStatusLabel.setText("Offline");
+                chatStatusLabel.setStyle("-fx-text-fill: gray;");
+            }
+            default -> {
+                chatStatusLabel.setText(user.getStatus().toString());
+                chatStatusLabel.setStyle("-fx-text-fill: gray;");
+            }
         }
     }
+
 }

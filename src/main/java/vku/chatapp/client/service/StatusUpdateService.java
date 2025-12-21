@@ -46,7 +46,7 @@ public class StatusUpdateService {
             public void run() {
                 checkStatusUpdates();
             }
-        }, 5000, 10000); // Poll every 10 seconds
+        }, 2000, 8000); // Poll every 10 seconds
 
         System.out.println("✅ Status polling started");
     }

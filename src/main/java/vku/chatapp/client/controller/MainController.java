@@ -123,6 +123,16 @@ import java.util.concurrent.Executors;
         startStatusPolling();
         loadFriendRequests();
         startRequestAutoRefresh();
+        Platform.runLater(() -> {
+            Stage stage = (Stage) usernameLabel.getScene().getWindow();
+            this.stage = stage; // gán cho BaseController
+
+            stage.setOnCloseRequest(event -> {
+                System.out.println("🚪 App window closed");
+                handleAppExit();
+            });
+        });
+
     }
 
     private void initializeP2PServer() {
@@ -245,13 +255,21 @@ import java.util.concurrent.Executors;
                             .getPeerDiscoveryService()
                             .updateHeartbeat(userId);
                 } catch (Exception e) {
-                    System.err.println("❌ Heartbeat failed: " + e.getMessage());
+                    System.err.println("❌ Heartbeat failed → OFFLINE");
+
+                    Platform.runLater(() -> {
+                        showError("Connection Lost", "You are offline.");
+                        handleAppExit();
+                    });
+
+                    cancel(); // stop timer
                 }
             }
-        }, 10000, 30000);
+        }, 0, 5000);
     }
 
-    private void startStatusPolling() {
+
+        private void startStatusPolling() {
         statusUpdateService.addListener(this::handleStatusUpdate);
         statusUpdateService.startPolling();
     }
@@ -946,40 +964,41 @@ import java.util.concurrent.Executors;
             statusUpdateService.removeListener(this::handleStatusUpdate);
 
             // Async cleanup
-            executorService.submit(() -> {
-                try {
-                    RMIClient.getInstance()
-                            .getUserService()
-                            .updateStatus(userId, UserStatus.OFFLINE);
-
-                    RMIClient.getInstance()
-                            .getPeerDiscoveryService()
-                            .unregisterPeer(userId);
-
-                    System.out.println("✅ Logged out");
-                } catch (Exception e) {
-                    System.err.println("⚠️ Logout error: " + e.getMessage());
-                }
-            });
-
-            if (heartbeatTimer != null) {
-                heartbeatTimer.cancel();
-            }
-
-            if (p2pServer != null) {
-                p2pServer.stop();
-            }
-
-            if (executorService != null) {
-                executorService.shutdown();
-            }
-
-            PeerRegistry.getInstance().clear();
-            UserSession.getInstance().clear();
-
-            if (stage == null) {
-                stage = (Stage) usernameLabel.getScene().getWindow();
-            }
+//            executorService.submit(() -> {
+//                try {
+//                    RMIClient.getInstance()
+//                            .getUserService()
+//                            .updateStatus(userId, UserStatus.OFFLINE);
+//
+//                    RMIClient.getInstance()
+//                            .getPeerDiscoveryService()
+//                            .unregisterPeer(userId);
+//
+//                    System.out.println("✅ Logged out");
+//                } catch (Exception e) {
+//                    System.err.println("⚠️ Logout error: " + e.getMessage());
+//                }
+//            });
+//
+//            if (heartbeatTimer != null) {
+//                heartbeatTimer.cancel();
+//            }
+//
+//            if (p2pServer != null) {
+//                p2pServer.stop();
+//            }
+//
+//            if (executorService != null) {
+//                executorService.shutdown();
+//            }
+//
+//            PeerRegistry.getInstance().clear();
+//            UserSession.getInstance().clear();
+//
+//            if (stage == null) {
+//                stage = (Stage) usernameLabel.getScene().getWindow();
+//            }
+            handleAppExit();
             switchScene("/view/login.fxml", 1200, 800);
 
         } catch (Exception e) {
@@ -1021,4 +1040,54 @@ import java.util.concurrent.Executors;
             }
         }
     }
-}
+        private void handleAppExit() {
+            try {
+                Long userId = UserSession.getInstance().getCurrentUser().getId();
+
+                // Stop polling
+                if (statusUpdateService != null) {
+                    statusUpdateService.stopPolling();
+                    statusUpdateService.removeListener(this::handleStatusUpdate);
+                }
+
+                // Stop heartbeat
+                if (heartbeatTimer != null) {
+                    heartbeatTimer.cancel();
+                }
+
+                // Async OFFLINE update
+                if (executorService != null) {
+                    executorService.submit(() -> {
+                        try {
+                            RMIClient.getInstance()
+                                    .getUserService()
+                                    .updateStatus(userId, UserStatus.OFFLINE);
+
+                            RMIClient.getInstance()
+                                    .getPeerDiscoveryService()
+                                    .unregisterPeer(userId);
+
+                            System.out.println("🔴 User set OFFLINE (app exit)");
+                        } catch (Exception e) {
+                            System.err.println("⚠️ Exit update failed: " + e.getMessage());
+                        }
+                    });
+                }
+
+                if (p2pServer != null) {
+                    p2pServer.stop();
+                }
+
+                if (executorService != null) {
+                    executorService.shutdownNow();
+                }
+
+                PeerRegistry.getInstance().clear();
+                UserSession.getInstance().clear();
+
+            } catch (Exception e) {
+                System.err.println("❌ handleAppExit error: " + e.getMessage());
+            }
+        }
+
+    }
