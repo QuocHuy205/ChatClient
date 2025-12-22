@@ -309,16 +309,6 @@ public class VideoCallController extends BaseController {
         }
     }
 
-    @FXML
-    private void handleSwitchCamera() {
-        try {
-            mediaManager.switchCamera();
-            System.out.println("🔄 Camera switched");
-        } catch (Exception e) {
-            System.err.println("❌ Error switching camera: " + e.getMessage());
-        }
-    }
-
     private void handleCallMessage(P2PMessage message) {
         if (isCallEnded) {
             return;

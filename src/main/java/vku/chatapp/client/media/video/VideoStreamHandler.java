@@ -1,12 +1,11 @@
 // FILE: vku/chatapp/client/media/video/VideoStreamHandler.java
-// ✅ OPTIMIZED: Higher quality, faster connection, JavaFX integrated
+// ✅ FIXED: Camera freeze issue
 
 package vku.chatapp.client.media.video;
 
 import javafx.application.Platform;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import org.bytedeco.javacv.*;
 import vku.chatapp.client.model.UserSession;
 import vku.chatapp.client.p2p.P2PClient;
 import vku.chatapp.client.p2p.PeerRegistry;
@@ -19,14 +18,9 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * ✅ OPTIMIZED VideoStreamHandler - JavaFX Integrated
- * - Higher video quality (720p, 85% JPEG)
- * - Faster connection with peer caching
- * - Display in JavaFX ImageView
- */
 public class VideoStreamHandler {
     private VideoCapture capture;
     private P2PClient p2pClient;
@@ -39,29 +33,28 @@ public class VideoStreamHandler {
     private Long remotePeerId;
     private int localP2PPort;
 
-    // JavaFX views
     private ImageView localVideoView;
     private ImageView remoteVideoView;
 
-    // JavaCV components
-    private Java2DFrameConverter converter;
+    private ConcurrentLinkedQueue<BufferedImage> remoteFrameBuffer;
 
-    // Frame buffers
-    private LinkedBlockingQueue<BufferedImage> remoteFrameBuffer;
-    private BufferedImage currentLocalFrame;
+    // ✅ OPTIMIZED: Balanced settings
+    private static final int TARGET_FPS = 25;
+    private static final int FRAME_INTERVAL_MS = 40;
+    private static final int VIDEO_WIDTH = 640;
+    private static final int VIDEO_HEIGHT = 480;
+    private static final float JPEG_QUALITY = 0.60f;
+    private static final int BUFFER_SIZE = 2;
 
-    // ✅ OPTIMIZED: Higher quality settings
-    private static final int TARGET_FPS = 30;
-    private static final int FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
-    private static final int VIDEO_WIDTH = 1280;  // 720p
-    private static final int VIDEO_HEIGHT = 720;
-    private static final float JPEG_QUALITY = 0.85f; // High quality
-    private static final int BUFFER_SIZE = 3;
-
-    // Stats
     private long sentFrames = 0;
     private long receivedFrames = 0;
     private long lastStatsTime = System.currentTimeMillis();
+
+    // ✅ FIX: Separate update tracking for local and remote
+    private AtomicReference<BufferedImage> pendingLocalFrame = new AtomicReference<>();
+    private AtomicReference<BufferedImage> pendingRemoteFrame = new AtomicReference<>();
+    private volatile boolean localViewNeedsUpdate = false;
+    private volatile boolean remoteViewNeedsUpdate = false;
 
     public VideoStreamHandler() {
         this.capture = new VideoCapture(VIDEO_WIDTH, VIDEO_HEIGHT);
@@ -69,13 +62,9 @@ public class VideoStreamHandler {
         this.peerRegistry = PeerRegistry.getInstance();
         this.isStreaming = new AtomicBoolean(false);
         this.isVideoEnabled = new AtomicBoolean(true);
-        this.remoteFrameBuffer = new LinkedBlockingQueue<>(BUFFER_SIZE);
-        this.converter = new Java2DFrameConverter();
+        this.remoteFrameBuffer = new ConcurrentLinkedQueue<>();
 
-        System.out.println("📹 VideoStreamHandler initialized (High Quality)");
-        System.out.println("   Resolution: " + VIDEO_WIDTH + "x" + VIDEO_HEIGHT);
-        System.out.println("   Quality: " + (JPEG_QUALITY * 100) + "%");
-        System.out.println("   FPS: " + TARGET_FPS);
+        System.out.println("📹 VideoStreamHandler initialized");
     }
 
     public void setLocalP2PPort(int port) {
@@ -85,7 +74,54 @@ public class VideoStreamHandler {
     public void setVideoViews(ImageView localView, ImageView remoteView) {
         this.localVideoView = localView;
         this.remoteVideoView = remoteView;
-        System.out.println("✅ JavaFX video views connected");
+
+        // ✅ FIX: Start UI update timer on JavaFX thread
+        Platform.runLater(this::startUIUpdateTimer);
+
+        System.out.println("✅ Video views connected");
+    }
+
+    // ✅ FIX: Dedicated UI update thread to prevent freezing
+    private void startUIUpdateTimer() {
+        javafx.animation.Timeline uiUpdateTimer = new javafx.animation.Timeline(
+                new javafx.animation.KeyFrame(javafx.util.Duration.millis(33), e -> {
+                    // Update local view
+                    if (localViewNeedsUpdate && pendingLocalFrame.get() != null) {
+                        BufferedImage frame = pendingLocalFrame.get();
+                        if (frame != null) {
+                            try {
+                                Image fxImage = bufferedImageToFXImage(frame);
+                                if (localVideoView != null) {
+                                    localVideoView.setImage(fxImage);
+                                }
+                            } catch (Exception ex) {
+                                // Silent fail
+                            }
+                        }
+                        localViewNeedsUpdate = false;
+                    }
+
+                    // Update remote view
+                    if (remoteViewNeedsUpdate && pendingRemoteFrame.get() != null) {
+                        BufferedImage frame = pendingRemoteFrame.get();
+                        if (frame != null) {
+                            try {
+                                Image fxImage = bufferedImageToFXImage(frame);
+                                if (remoteVideoView != null) {
+                                    remoteVideoView.setImage(fxImage);
+                                }
+                            } catch (Exception ex) {
+                                // Silent fail
+                            }
+                        }
+                        remoteViewNeedsUpdate = false;
+                    }
+                })
+        );
+        uiUpdateTimer.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+        uiUpdateTimer.play();
+
+        System.out.println("✅ UI update timer started");
     }
 
     public void startVideoStream(Long peerId) {
@@ -100,30 +136,27 @@ public class VideoStreamHandler {
         remoteFrameBuffer.clear();
 
         try {
-            // ✅ Pre-fetch peer info for faster connection
             PeerInfo peerInfo = fetchFreshPeerInfo(peerId);
             if (peerInfo != null) {
-                System.out.println("✅ Peer info cached: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
+                System.out.println("✅ Peer ready: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
             }
 
             capture.startCapture();
             System.out.println("✅ Video capture started");
 
-            // Start capture thread
             captureThread = new Thread(this::captureAndSendLoop);
-            captureThread.setName("VideoCapture-HQ");
-            captureThread.setPriority(Thread.NORM_PRIORITY + 1);
+            captureThread.setName("VideoCapture-Optimized");
+            captureThread.setPriority(Thread.NORM_PRIORITY);
             captureThread.setDaemon(true);
             captureThread.start();
 
-            // Start render thread
             renderThread = new Thread(this::renderLoop);
-            renderThread.setName("VideoRender-HQ");
-            renderThread.setPriority(Thread.NORM_PRIORITY + 1);
+            renderThread.setName("VideoRender-Optimized");
+            renderThread.setPriority(Thread.NORM_PRIORITY);
             renderThread.setDaemon(true);
             renderThread.start();
 
-            System.out.println("✅ Video streaming started to peer: " + peerId);
+            System.out.println("✅ Video streaming started");
 
         } catch (Exception e) {
             System.err.println("❌ Error starting video: " + e.getMessage());
@@ -141,7 +174,7 @@ public class VideoStreamHandler {
                 long timeSinceLastFrame = currentTime - lastFrameTime;
 
                 if (timeSinceLastFrame < FRAME_INTERVAL_MS) {
-                    Thread.sleep(FRAME_INTERVAL_MS - timeSinceLastFrame);
+                    Thread.sleep(Math.max(1, FRAME_INTERVAL_MS - timeSinceLastFrame));
                     continue;
                 }
 
@@ -149,12 +182,10 @@ public class VideoStreamHandler {
                     BufferedImage frame = capture.captureFrame();
 
                     if (frame != null) {
-                        currentLocalFrame = frame;
+                        // ✅ FIX: Non-blocking local view update
+                        pendingLocalFrame.set(frame);
+                        localViewNeedsUpdate = true;
 
-                        // Display local video
-                        updateLocalVideo(frame);
-
-                        // Encode and send
                         byte[] encodedFrame = encodeFrame(frame);
                         if (encodedFrame != null && encodedFrame.length > 0) {
                             boolean sent = sendVideoFrame(encodedFrame);
@@ -163,10 +194,9 @@ public class VideoStreamHandler {
                             }
                         }
 
-                        // Stats every 3 seconds
-                        if (currentTime - lastStatsTime >= 3000 && sentFrames > 0) {
+                        if (currentTime - lastStatsTime >= 5000 && sentFrames > 0) {
                             int fps = (int) (sentFrames / ((currentTime - lastStatsTime) / 1000.0));
-                            System.out.println("📹 Sending: " + fps + " fps, Total: " + sentFrames + " frames");
+                            System.out.println("📹 Sending: " + fps + " fps");
                             lastStatsTime = currentTime;
                             sentFrames = 0;
                         }
@@ -188,10 +218,14 @@ public class VideoStreamHandler {
     private void renderLoop() {
         while (isStreaming.get()) {
             try {
-                BufferedImage remoteFrame = remoteFrameBuffer.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+                BufferedImage remoteFrame = remoteFrameBuffer.poll();
 
                 if (remoteFrame != null) {
-                    updateRemoteVideo(remoteFrame);
+                    // ✅ FIX: Non-blocking remote view update
+                    pendingRemoteFrame.set(remoteFrame);
+                    remoteViewNeedsUpdate = true;
+                } else {
+                    Thread.sleep(10);
                 }
 
             } catch (InterruptedException e) {
@@ -204,36 +238,12 @@ public class VideoStreamHandler {
         System.out.println("🛑 Render loop ended");
     }
 
-    private void updateLocalVideo(BufferedImage frame) {
-        if (localVideoView == null) return;
-
-        Platform.runLater(() -> {
-            try {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                javax.imageio.ImageIO.write(frame, "jpg", baos);
-                ByteArrayInputStream bis = new ByteArrayInputStream(baos.toByteArray());
-                Image fxImage = new Image(bis);
-                localVideoView.setImage(fxImage);
-            } catch (Exception e) {
-                System.err.println("⚠️ Error updating local video: " + e.getMessage());
-            }
-        });
-    }
-
-    private void updateRemoteVideo(BufferedImage frame) {
-        if (remoteVideoView == null) return;
-
-        Platform.runLater(() -> {
-            try {
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                javax.imageio.ImageIO.write(frame, "jpg", baos);
-                ByteArrayInputStream bis = new ByteArrayInputStream(baos.toByteArray());
-                Image fxImage = new Image(bis);
-                remoteVideoView.setImage(fxImage);
-            } catch (Exception e) {
-                System.err.println("⚠️ Error updating remote video: " + e.getMessage());
-            }
-        });
+    // ✅ FIX: Optimized image conversion
+    private Image bufferedImageToFXImage(BufferedImage bimg) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(bimg, "jpg", baos);
+        ByteArrayInputStream bis = new ByteArrayInputStream(baos.toByteArray());
+        return new Image(bis);
     }
 
     private byte[] encodeFrame(BufferedImage frame) {
@@ -253,7 +263,6 @@ public class VideoStreamHandler {
 
             return baos.toByteArray();
         } catch (Exception e) {
-            System.err.println("❌ Encode error: " + e.getMessage());
             return null;
         }
     }
@@ -284,25 +293,20 @@ public class VideoStreamHandler {
                 BufferedImage image = javax.imageio.ImageIO.read(bis);
 
                 if (image != null) {
-                    if (!remoteFrameBuffer.offer(image)) {
+                    if (remoteFrameBuffer.size() >= BUFFER_SIZE) {
                         remoteFrameBuffer.poll();
-                        remoteFrameBuffer.offer(image);
                     }
+                    remoteFrameBuffer.offer(image);
 
                     receivedFrames++;
 
                     if (receivedFrames == 1) {
-                        System.out.println("✅ First remote frame received!");
-                    }
-
-                    if (receivedFrames % 90 == 0) {
-                        System.out.println("✅ Received " + receivedFrames + " frames, " +
-                                (frameData.length / 1024) + " KB/frame");
+                        System.out.println("✅ First frame received!");
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("❌ Error receiving video: " + e.getMessage());
+            // Silent fail
         }
     }
 
@@ -325,7 +329,7 @@ public class VideoStreamHandler {
 
         if (captureThread != null && captureThread.isAlive()) {
             try {
-                captureThread.join(1000);
+                captureThread.join(500);
             } catch (InterruptedException e) {
                 captureThread.interrupt();
             }
@@ -333,19 +337,22 @@ public class VideoStreamHandler {
 
         if (renderThread != null && renderThread.isAlive()) {
             try {
-                renderThread.join(1000);
+                renderThread.join(500);
             } catch (InterruptedException e) {
                 renderThread.interrupt();
             }
         }
 
-        // Clear views
         if (localVideoView != null) {
             Platform.runLater(() -> localVideoView.setImage(null));
         }
         if (remoteVideoView != null) {
             Platform.runLater(() -> remoteVideoView.setImage(null));
         }
+
+        remoteFrameBuffer.clear();
+        pendingLocalFrame.set(null);
+        pendingRemoteFrame.set(null);
 
         System.out.println("✅ Video streaming stopped");
     }
@@ -362,7 +369,6 @@ public class VideoStreamHandler {
                 peerInfo = RMIClient.getInstance().getPeerDiscoveryService().getPeerInfo(userId);
                 if (peerInfo != null) {
                     peerRegistry.addPeer(peerInfo);
-                    System.out.println("✅ Fetched peer info: " + peerInfo.getAddress() + ":" + peerInfo.getPort());
                 }
             } catch (Exception e) {
                 System.err.println("❌ Error fetching peer info: " + e.getMessage());
@@ -380,8 +386,7 @@ public class VideoStreamHandler {
     public enum VideoQuality {
         LOW(320, 240, 15),
         MEDIUM(640, 480, 25),
-        HIGH(1280, 720, 30),
-        FULL_HD(1920, 1080, 30);
+        HIGH(1280, 720, 30);
 
         final int width, height, fps;
         VideoQuality(int w, int h, int f) {

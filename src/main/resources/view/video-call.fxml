@@ -31,7 +31,7 @@
                style="-fx-text-fill: white; -fx-font-size: 16px; -fx-font-weight: bold; -fx-background-color: rgba(255,255,255,0.1); -fx-padding: 5 15; -fx-background-radius: 15;"/>
     </HBox>
 
-    <!-- Video Container (Fixed 590px) -->
+    <!-- Video Container (Fixed 590px) - NO OVERLAYS -->
     <StackPane fx:id="callContainer"
                prefWidth="1000" prefHeight="590"
                minWidth="1000" minHeight="590"
@@ -46,58 +46,38 @@
                        fitHeight="590"
                        style="-fx-background-color: #0a0a0a;">
             </ImageView>
-
-            <!-- Placeholder when no video -->
-            <VBox fx:id="remoteVideoPlaceholder"
-                  alignment="CENTER" spacing="15"
-                  style="-fx-background-color: rgba(0,0,0,0.7);">
-                <Label text="📹" style="-fx-font-size: 60px;"/>
-                <Label text="Waiting for video..."
-                       style="-fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold;"/>
-            </VBox>
         </StackPane>
 
         <!-- Local Video (Picture-in-Picture - Bottom Right) -->
         <HBox alignment="BOTTOM_RIGHT"
               StackPane.alignment="BOTTOM_RIGHT">
             <padding>
-                <Insets bottom="20" right="20"/>
+                <Insets bottom="15" right="15"/>
             </padding>
 
-            <StackPane style="-fx-background-color: #1a1a1a; -fx-border-color: rgba(255,255,255,0.4); -fx-border-width: 3; -fx-background-radius: 15; -fx-border-radius: 15; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.8), 20, 0, 0, 5);">
+            <!-- Fixed-size PiP container -->
+            <StackPane fx:id="localVideoContainer"
+                       prefWidth="200" prefHeight="150"
+                       minWidth="200" minHeight="150"
+                       maxWidth="200" maxHeight="150"
+                       style="
+                   -fx-background-color: #1a1a1a;
+                   -fx-border-color: rgba(255,255,255,0.35);
+                   -fx-border-width: 1.5;
+                   -fx-background-radius: 10;
+                   -fx-border-radius: 10;
+                   -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 10, 0, 0, 2);
+               ">
 
-                <!-- Local Video -->
                 <ImageView fx:id="localVideoView"
                            preserveRatio="true"
-                           fitWidth="280"
-                           fitHeight="210"
-                           style="-fx-background-color: #0a0a0a; -fx-background-radius: 12;">
-                </ImageView>
-
-                <!-- "You" Label -->
-                <HBox alignment="CENTER" spacing="5"
-                      style="-fx-background-color: rgba(0,0,0,0.75); -fx-padding: 6 12; -fx-background-radius: 8;"
-                      StackPane.alignment="BOTTOM_CENTER">
-                    <StackPane.margin>
-                        <Insets bottom="10"/>
-                    </StackPane.margin>
-                    <Label text="📹" style="-fx-font-size: 13px;"/>
-                    <Label text="You"
-                           style="-fx-text-fill: white; -fx-font-size: 13px; -fx-font-weight: bold;"/>
-                </HBox>
+                           fitWidth="200"
+                           fitHeight="150"
+                           smooth="true"
+                           style="-fx-background-color: #0a0a0a;"/>
             </StackPane>
         </HBox>
 
-        <!-- Connection Status Badge (Top Left) -->
-        <HBox alignment="CENTER" spacing="6"
-              StackPane.alignment="TOP_LEFT"
-              style="-fx-background-color: rgba(0,0,0,0.65); -fx-padding: 8 15; -fx-background-radius: 12; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0, 0, 2);">
-            <StackPane.margin>
-                <Insets top="15" left="15"/>
-            </StackPane.margin>
-            <Label text="🔴" style="-fx-font-size: 12px;"/>
-            <Label text="LIVE" style="-fx-text-fill: white; -fx-font-size: 12px; -fx-font-weight: bold;"/>
-        </HBox>
     </StackPane>
 
     <!-- Control Panel (Fixed 100px) -->
@@ -107,68 +87,44 @@
 
         <!-- Mute Button -->
         <VBox alignment="CENTER" spacing="6">
-            <StackPane>
-                <Button fx:id="muteButton"
-                        onAction="#handleMute"
-                        prefWidth="58" prefHeight="58"
-                        style="-fx-background-color: #4a4a4a; -fx-background-radius: 50%; -fx-cursor: hand; -fx-border-color: transparent; -fx-border-width: 0;">
-                    <graphic>
-                        <Label text="🎤" style="-fx-font-size: 24px;"/>
-                    </graphic>
-                </Button>
-                <!-- Hover Effect Circle -->
-                <StackPane style="-fx-background-color: transparent; -fx-pref-width: 58; -fx-pref-height: 58; -fx-background-radius: 50%;" mouseTransparent="true"/>
-            </StackPane>
+            <Button fx:id="muteButton"
+                    onAction="#handleMute"
+                    prefWidth="58" prefHeight="58"
+                    style="-fx-background-color: #4a4a4a; -fx-background-radius: 50%; -fx-cursor: hand;">
+                <graphic>
+                    <Label text="🎤" style="-fx-font-size: 24px;"/>
+                </graphic>
+            </Button>
             <Label fx:id="muteLabel" text="Mute"
                    style="-fx-text-fill: #b8b8b8; -fx-font-size: 11px; -fx-font-weight: 600;"/>
         </VBox>
 
         <!-- Video Toggle Button -->
         <VBox alignment="CENTER" spacing="6">
-            <StackPane>
-                <Button fx:id="videoToggleButton"
-                        onAction="#handleVideoToggle"
-                        prefWidth="58" prefHeight="58"
-                        style="-fx-background-color: #4a4a4a; -fx-background-radius: 50%; -fx-cursor: hand; -fx-border-color: transparent; -fx-border-width: 0;">
-                    <graphic>
-                        <Label text="🎥" style="-fx-font-size: 24px;"/>
-                    </graphic>
-                </Button>
-            </StackPane>
+            <Button fx:id="videoToggleButton"
+                    onAction="#handleVideoToggle"
+                    prefWidth="58" prefHeight="58"
+                    style="-fx-background-color: #4a4a4a; -fx-background-radius: 50%; -fx-cursor: hand;">
+                <graphic>
+                    <Label text="🎥" style="-fx-font-size: 24px;"/>
+                </graphic>
+            </Button>
             <Label fx:id="videoLabel" text="Camera On"
                    style="-fx-text-fill: #b8b8b8; -fx-font-size: 11px; -fx-font-weight: 600;"/>
         </VBox>
 
-        <!-- End Call Button (Larger & Red) -->
+        <!-- End Call Button -->
         <VBox alignment="CENTER" spacing="6">
-            <StackPane>
-                <Button fx:id="endCallButton"
-                        onAction="#handleEndCall"
-                        prefWidth="65" prefHeight="65"
-                        style="-fx-background-color: #d13438; -fx-background-radius: 50%; -fx-cursor: hand; -fx-border-color: transparent; -fx-border-width: 0; -fx-effect: dropshadow(gaussian, rgba(209,52,56,0.5), 15, 0, 0, 3);">
-                    <graphic>
-                        <Label text="📞" style="-fx-font-size: 28px; -fx-rotate: 135;"/>
-                    </graphic>
-                </Button>
-            </StackPane>
+            <Button fx:id="endCallButton"
+                    onAction="#handleEndCall"
+                    prefWidth="65" prefHeight="65"
+                    style="-fx-background-color: #d13438; -fx-background-radius: 50%; -fx-cursor: hand; -fx-effect: dropshadow(gaussian, rgba(209,52,56,0.5), 15, 0, 0, 3);">
+                <graphic>
+                    <Label text="📞" style="-fx-font-size: 28px; -fx-rotate: 135;"/>
+                </graphic>
+            </Button>
             <Label text="End Call"
                    style="-fx-text-fill: #ff6b6b; -fx-font-size: 11px; -fx-font-weight: bold;"/>
-        </VBox>
-
-        <!-- Switch Camera Button -->
-        <VBox alignment="CENTER" spacing="6">
-            <StackPane>
-                <Button fx:id="switchCameraButton"
-                        onAction="#handleSwitchCamera"
-                        prefWidth="58" prefHeight="58"
-                        style="-fx-background-color: #4a4a4a; -fx-background-radius: 50%; -fx-cursor: hand; -fx-border-color: transparent; -fx-border-width: 0;">
-                    <graphic>
-                        <Label text="🔄" style="-fx-font-size: 24px;"/>
-                    </graphic>
-                </Button>
-            </StackPane>
-            <Label text="Switch"
-                   style="-fx-text-fill: #b8b8b8; -fx-font-size: 11px; -fx-font-weight: 600;"/>
         </VBox>
 
     </HBox>

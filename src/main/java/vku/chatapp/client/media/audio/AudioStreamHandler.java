@@ -1,5 +1,5 @@
 // FILE: vku/chatapp/client/media/audio/AudioStreamHandler.java
-// ✅ OPTIMIZED: Higher quality, reduced echo/noise
+// ✅ OPTIMIZED: Lower latency, better sync
 
 package vku.chatapp.client.media.audio;
 
@@ -13,7 +13,7 @@ import vku.chatapp.common.protocol.P2PMessageType;
 
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class AudioStreamHandler {
     private AudioCapture capture;
@@ -28,14 +28,13 @@ public class AudioStreamHandler {
     private Long remotePeerId;
     private int localP2PPort;
 
-    // ✅ OPTIMIZED: Higher quality settings
-    private static final int BUFFER_SIZE = 2048; // Smaller buffer = less latency
+    // ✅ OPTIMIZED: Lower latency settings
+    private static final int BUFFER_SIZE = 640; // Smaller = lower latency (40ms at 16kHz)
     private static final int FRAME_RATE = 50; // 50 packets/sec
-    private static final int FRAME_INTERVAL_MS = 1000 / FRAME_RATE;
+    private static final int FRAME_INTERVAL_MS = 20; // 20ms intervals
 
-    // Audio packet queue for smooth playback
-    private LinkedBlockingQueue<byte[]> audioQueue;
-    private static final int QUEUE_SIZE = 10;
+    // ✅ Use ConcurrentLinkedQueue for better performance
+    private ConcurrentLinkedQueue<byte[]> audioQueue;
 
     public AudioStreamHandler() {
         this.capture = new AudioCapture();
@@ -44,14 +43,13 @@ public class AudioStreamHandler {
         this.peerRegistry = PeerRegistry.getInstance();
         this.isStreaming = new AtomicBoolean(false);
         this.isMuted = new AtomicBoolean(false);
-        this.audioQueue = new LinkedBlockingQueue<>(QUEUE_SIZE);
+        this.audioQueue = new ConcurrentLinkedQueue<>();
 
-        System.out.println("🎤 AudioStreamHandler initialized (High Quality Mode)");
+        System.out.println("🎤 AudioStreamHandler initialized (Low Latency Mode)");
     }
 
     public void setLocalP2PPort(int port) {
         this.localP2PPort = port;
-        System.out.println("🎤 Local P2P port: " + port);
     }
 
     public void startAudioStream(Long peerId) {
@@ -68,23 +66,25 @@ public class AudioStreamHandler {
         try {
             // Start capture
             capture.startCapture();
-            System.out.println("✅ Audio capture started");
+
+            // Start playback
+            player.startPlayback();
 
             // Start capture thread
             captureThread = new Thread(this::captureAndSendLoop);
-            captureThread.setName("AudioCapture-HQ");
-            captureThread.setPriority(Thread.MAX_PRIORITY); // High priority
+            captureThread.setName("AudioCapture-LowLatency");
+            captureThread.setPriority(Thread.MAX_PRIORITY);
             captureThread.setDaemon(true);
             captureThread.start();
 
             // Start playback thread
             playbackThread = new Thread(this::playbackLoop);
-            playbackThread.setName("AudioPlayback-HQ");
+            playbackThread.setName("AudioPlayback-LowLatency");
             playbackThread.setPriority(Thread.MAX_PRIORITY);
             playbackThread.setDaemon(true);
             playbackThread.start();
 
-            System.out.println("✅ Audio streaming started (peer: " + peerId + ")");
+            System.out.println("✅ Audio streaming started");
 
         } catch (Exception e) {
             System.err.println("❌ Error starting audio: " + e.getMessage());
@@ -95,30 +95,29 @@ public class AudioStreamHandler {
 
     private void captureAndSendLoop() {
         long frameCount = 0;
+        long lastFrameTime = System.nanoTime();
 
         while (isStreaming.get() && capture.isCapturing()) {
             try {
-                long startTime = System.currentTimeMillis();
-
                 if (!isMuted.get()) {
                     byte[] audioData = capture.captureAudio(BUFFER_SIZE);
 
                     if (audioData != null && audioData.length > 0) {
                         sendAudioFrame(audioData);
                         frameCount++;
-
-                        if (frameCount % 500 == 0) {
-                            System.out.println("🎤 Sent " + frameCount + " audio frames");
-                        }
                     }
                 }
 
-                // Precise timing
-                long elapsed = System.currentTimeMillis() - startTime;
+                // Precise timing using nanoTime
+                long currentTime = System.nanoTime();
+                long elapsed = (currentTime - lastFrameTime) / 1_000_000; // Convert to ms
                 long sleepTime = FRAME_INTERVAL_MS - elapsed;
+
                 if (sleepTime > 0) {
                     Thread.sleep(sleepTime);
                 }
+
+                lastFrameTime = System.nanoTime();
 
             } catch (InterruptedException e) {
                 break;
@@ -131,26 +130,22 @@ public class AudioStreamHandler {
     }
 
     private void playbackLoop() {
-        try {
-            player.startPlayback();
-            System.out.println("✅ Audio playback started");
+        while (isStreaming.get()) {
+            try {
+                byte[] audioData = audioQueue.poll();
 
-            while (isStreaming.get()) {
-                try {
-                    // Wait for audio data (blocking)
-                    byte[] audioData = audioQueue.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
-
-                    if (audioData != null) {
-                        player.playAudio(audioData);
-                    }
-
-                } catch (InterruptedException e) {
-                    break;
+                if (audioData != null) {
+                    player.playAudio(audioData);
+                } else {
+                    // Small sleep if queue is empty
+                    Thread.sleep(5);
                 }
-            }
 
-        } catch (Exception e) {
-            System.err.println("❌ Playback error: " + e.getMessage());
+            } catch (InterruptedException e) {
+                break;
+            } catch (Exception e) {
+                System.err.println("❌ Playback error: " + e.getMessage());
+            }
         }
 
         System.out.println("🛑 Audio playback loop ended");
@@ -179,9 +174,11 @@ public class AudioStreamHandler {
         try {
             byte[] audioData = message.getFileData();
             if (audioData != null && audioData.length > 0) {
-                // Add to queue (drop if full to avoid lag)
-                if (!audioQueue.offer(audioData)) {
-                    // Queue full, drop oldest
+                // Add to queue, limit size to prevent lag
+                if (audioQueue.size() < 5) {
+                    audioQueue.offer(audioData);
+                } else {
+                    // Drop oldest if queue is full
                     audioQueue.poll();
                     audioQueue.offer(audioData);
                 }
@@ -209,7 +206,7 @@ public class AudioStreamHandler {
 
         if (captureThread != null && captureThread.isAlive()) {
             try {
-                captureThread.join(1000);
+                captureThread.join(500);
             } catch (InterruptedException e) {
                 captureThread.interrupt();
             }
@@ -217,7 +214,7 @@ public class AudioStreamHandler {
 
         if (playbackThread != null && playbackThread.isAlive()) {
             try {
-                playbackThread.join(1000);
+                playbackThread.join(500);
             } catch (InterruptedException e) {
                 playbackThread.interrupt();
             }
@@ -252,14 +249,13 @@ public class AudioStreamHandler {
     }
 
     public void setAudioQuality(AudioQuality quality) {
-        // Apply quality settings
         System.out.println("🎵 Audio quality: " + quality);
     }
 
     public enum AudioQuality {
-        LOW(22050, 8),
-        MEDIUM(44100, 16),
-        HIGH(48000, 16);
+        LOW(8000, 8),
+        MEDIUM(16000, 16),
+        HIGH(24000, 16);
 
         private final int sampleRate;
         private final int bitDepth;

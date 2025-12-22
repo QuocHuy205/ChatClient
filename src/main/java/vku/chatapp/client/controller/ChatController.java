@@ -383,8 +383,6 @@ public class ChatController extends BaseController {
                 if (messageType == MessageType.IMAGE) {
                     fileTransferService.cacheImage(file);
                 }
-
-
                 Message savedMessage = RMIClient.getInstance()
                         .getMessageService()
                         .saveMessage(message);
@@ -410,9 +408,6 @@ public class ChatController extends BaseController {
                     displayMessage(savedMessage, false);
 
                     if (!success) {
-//                        showInfo(messageType + " Sent",
-//                                messageType + " sent successfully: " + file.getName());
-//                    } else {
                         showError("Send Failed",
                                 "Could not send " + messageType.toString().toLowerCase() + ". Message saved to database.");
                     }
@@ -427,11 +422,6 @@ public class ChatController extends BaseController {
                 });
             }
         }).start();
-    }
-
-    @FXML
-    private void handleEmoji() {
-        showInfo("Emoji", "Emoji picker coming soon!");
     }
 
     private void handleIncomingMessage(P2PMessage p2pMessage) {
@@ -584,10 +574,6 @@ public class ChatController extends BaseController {
                         String savePath = messageType == MessageType.IMAGE
                                 ? fileTransferService.getImageCachePath()
                                 : fileTransferService.getDownloadPath();
-
-//                        showInfo(messageType + " Received",
-//                                messageType + " received: " + p2pMessage.getFileName() +
-//                                        "\nSaved to: " + savePath);
                     });
 
                 } catch (Exception e) {
@@ -597,9 +583,6 @@ public class ChatController extends BaseController {
         });
     }
 
-    /**
-     * ✅ ENHANCED: Display message with image preview and download button
-     */
     private void displayMessage(Message message, boolean addToSession) {
         if (message.getContent() == null || message.getContent().trim().isEmpty()) {
             if (message.getType() != MessageType.FILE && message.getType() != MessageType.IMAGE) {
@@ -696,9 +679,6 @@ public class ChatController extends BaseController {
         messagesContainer.getChildren().add(messageBox);
     }
 
-    /**
-     * ✅ Create image bubble with inline preview (click to view full size)
-     */
     private VBox createImageBubble(Message message, boolean isSent) {
         VBox container = new VBox(8);
         container.setAlignment(Pos.CENTER_LEFT);
@@ -738,10 +718,6 @@ public class ChatController extends BaseController {
 
             container.getChildren().add(imageView);
 
-//            Label name = new Label(message.getFileName());
-//            name.setStyle("-fx-font-size: 11px; -fx-text-fill: #888;");
-//            container.getChildren().add(name);
-
         } catch (Exception e) {
             Label error = new Label("🖼️ Image not available");
             error.setStyle("-fx-text-fill: red;");
@@ -750,9 +726,7 @@ public class ChatController extends BaseController {
 
         return container;
     }
-    /**
-     * ✅ Create file bubble with Open button
-     */
+
     private VBox createFileBubbleWithOpen(Message message, boolean isSent) {
         VBox container = new VBox(8);
 
@@ -813,13 +787,10 @@ public class ChatController extends BaseController {
         );
         openFolderButton.setOnAction(e -> openFileLocation(message));
 
-// Button box
         HBox buttonBox = new HBox(8, openButton, openFolderButton);
         buttonBox.setAlignment(Pos.CENTER_LEFT);
 
         container.getChildren().addAll(fileInfoBox, buttonBox);
-
-//        container.getChildren().addAll(fileInfoBox, openButton);
 
         fileNameLabel.setOnMouseClicked(e -> {
             if (e.getClickCount() == 2) {
@@ -829,9 +800,7 @@ public class ChatController extends BaseController {
 
         return container;
     }
-    /**
-     * ✅ Open file directly
-     */
+
     private void openFile(Message message) {
         try {
             File file = new File(
@@ -874,118 +843,6 @@ public class ChatController extends BaseController {
         }
     }
 
-
-    /**
-     * ✅ Download file to user's chosen location
-     */
-    private void downloadFile(Message message) {
-        try {
-            // Source file (from received files location)
-            File sourceFile = new File(fileTransferService.getDownloadPath() + message.getFileName());
-
-            if (!sourceFile.exists()) {
-                showError("File Not Found", "File has been moved or deleted: " + message.getFileName());
-                return;
-            }
-
-            // Let user choose save location
-            FileChooser fileChooser = new FileChooser();
-            fileChooser.setTitle("Save File");
-            fileChooser.setInitialFileName(message.getFileName());
-
-            // Set initial directory to Downloads
-            File downloadsDir = new File(System.getProperty("user.home"), "Downloads");
-            if (downloadsDir.exists()) {
-                fileChooser.setInitialDirectory(downloadsDir);
-            }
-
-            File destinationFile = fileChooser.showSaveDialog(stage);
-
-            if (destinationFile != null) {
-                // Copy file to chosen location
-                Files.copy(
-                        sourceFile.toPath(),
-                        destinationFile.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING
-                );
-
-                showInfo("Download Complete",
-                        "File saved to: " + destinationFile.getAbsolutePath());
-
-                // Ask if user wants to open the file
-                Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
-                alert.setTitle("Open File");
-                alert.setHeaderText("File downloaded successfully!");
-                alert.setContentText("Do you want to open the file now?");
-
-                ButtonType buttonYes = new ButtonType("Yes");
-                ButtonType buttonNo = new ButtonType("No");
-                alert.getButtonTypes().setAll(buttonYes, buttonNo);
-
-                alert.showAndWait().ifPresent(response -> {
-                    if (response == buttonYes) {
-                        try {
-                            Desktop.getDesktop().open(destinationFile);
-                        } catch (Exception ex) {
-                            showError("Open Error", "Could not open file: " + ex.getMessage());
-                        }
-                    }
-                });
-            }
-
-        } catch (Exception e) {
-            System.err.println("❌ Error downloading file: " + e.getMessage());
-            e.printStackTrace();
-            showError("Download Error", "Failed to download file: " + e.getMessage());
-        }
-    }
-
-    /**
-     * ✅ Create file bubble with icon
-     */
-    private VBox createFileBubble(Message message, boolean isSent) {
-        VBox container = new VBox(5);
-
-        String fileIcon = getFileIcon(message.getFileName());
-
-        Label fileLabel = new Label(fileIcon + " " + message.getFileName());
-        fileLabel.setStyle(
-                "-fx-text-fill: " + (isSent ? "white" : "#323130") + ";" +
-                        "-fx-font-size: 14px;" +
-                        "-fx-font-weight: bold;"
-        );
-
-        if (message.getFileSize() != null) {
-            Label sizeLabel = new Label(formatFileSize(message.getFileSize()));
-            sizeLabel.setStyle(
-                    "-fx-text-fill: " + (isSent ? "rgba(255,255,255,0.8)" : "#605e5c") + ";" +
-                            "-fx-font-size: 11px;"
-            );
-            container.getChildren().addAll(fileLabel, sizeLabel);
-        } else {
-            container.getChildren().add(fileLabel);
-        }
-
-        // ✅ Click to open file
-        container.setOnMouseClicked(e -> {
-            File file = new File(fileTransferService.getDownloadPath() + message.getFileName());
-            if (file.exists()) {
-                try {
-                    Desktop.getDesktop().open(file);
-                } catch (Exception ex) {
-                    showError("Open Error", "Could not open file: " + ex.getMessage());
-                }
-            }
-        });
-
-        container.setStyle("-fx-cursor: hand;");
-
-        return container;
-    }
-
-    /**
-     * ✅ Get file icon based on extension
-     */
     private String getFileIcon(String fileName) {
         if (fileName == null) return "📎";
 
@@ -1011,15 +868,6 @@ public class ChatController extends BaseController {
         return String.format("%.1f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
-    public void setLocalP2PServer(P2PServer server) {
-        this.localP2PServer = server;
-
-        // Update MessageService
-        if (messageService != null) {
-            messageService.setLocalP2PServer(server);
-        }
-
-    }
     private void updateChatStatus(UserDTO user) {
         if (user == null || user.getStatus() == null) {
             chatStatusLabel.setText("Offline");

@@ -156,13 +156,6 @@ public class FileTransferService {
         }
     }
 
-    /**
-     * ✅ Get cached image file (for displaying in chat)
-     */
-    public File getCachedImageFile(String fileName) {
-        File file = new File(imageCachePath + fileName);
-        return file.exists() ? file : null;
-    }
 
     /**
      * ✅ Check if file is an image

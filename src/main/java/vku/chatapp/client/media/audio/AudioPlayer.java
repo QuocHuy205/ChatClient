@@ -1,5 +1,5 @@
 // FILE: vku/chatapp/client/media/audio/AudioPlayer.java
-// ✅ OPTIMIZED: 48kHz, echo cancellation
+// ✅ OPTIMIZED: Lower latency, smoother playback
 
 package vku.chatapp.client.media.audio;
 
@@ -11,14 +11,14 @@ public class AudioPlayer {
     private boolean isPlaying = false;
 
     public AudioPlayer() {
-        // ✅ HIGH QUALITY: Match capture format (48kHz, 16-bit, mono)
+        // ✅ Match capture format: 16kHz for lower latency
         format = new AudioFormat(
                 AudioFormat.Encoding.PCM_SIGNED,
-                48000.0f,  // 48kHz
+                16000.0f,  // 16kHz
                 16,        // 16-bit
                 1,         // Mono
                 2,         // Frame size
-                48000.0f,  // Frame rate
+                16000.0f,  // Frame rate
                 false      // Little endian
         );
     }
@@ -28,23 +28,21 @@ public class AudioPlayer {
 
         if (!AudioSystem.isLineSupported(info)) {
             System.err.println("⚠️ Line not supported, trying fallback");
-            // Fallback
-            format = new AudioFormat(44100, 16, 1, true, false);
+            format = new AudioFormat(16000, 16, 1, true, false);
             info = new DataLine.Info(SourceDataLine.class, format);
         }
 
         speakers = (SourceDataLine) AudioSystem.getLine(info);
 
-        // ✅ Larger buffer for smoother playback
-        int bufferSize = (int) format.getSampleRate() * format.getFrameSize();
+        // ✅ Smaller buffer for lower latency
+        int bufferSize = (int) (format.getSampleRate() * format.getFrameSize() * 0.1); // 100ms
         speakers.open(format, bufferSize);
         speakers.start();
         isPlaying = true;
 
         System.out.println("✅ Audio playback started:");
         System.out.println("   Sample Rate: " + format.getSampleRate() + " Hz");
-        System.out.println("   Bit Depth: " + format.getSampleSizeInBits() + " bit");
-        System.out.println("   Channels: " + format.getChannels());
+        System.out.println("   Buffer: " + bufferSize + " bytes (low latency)");
     }
 
     public void playAudio(byte[] audioData) {
@@ -53,14 +51,10 @@ public class AudioPlayer {
         }
 
         try {
-            // ✅ Write audio data with flow control
+            // ✅ Write data immediately without chunking
             int written = 0;
-            int chunkSize = 4096;
-
             while (written < audioData.length && isPlaying) {
-                int toWrite = Math.min(chunkSize, audioData.length - written);
-                int result = speakers.write(audioData, written, toWrite);
-
+                int result = speakers.write(audioData, written, audioData.length - written);
                 if (result > 0) {
                     written += result;
                 } else {
@@ -78,7 +72,7 @@ public class AudioPlayer {
             isPlaying = false;
 
             try {
-                speakers.drain(); // Wait for buffer to empty
+                speakers.flush(); // Clear buffer instead of drain
                 speakers.stop();
                 speakers.close();
                 System.out.println("✅ Audio playback stopped");

@@ -100,16 +100,6 @@
             </tooltip>
         </Button>
 
-        <!-- Emoji Button -->
-        <Button fx:id="emojiButton"
-                text="😊"
-                styleClass="icon-button-large"
-                onAction="#handleEmoji">
-            <tooltip>
-                <Tooltip text="Insert Emoji"/>
-            </tooltip>
-        </Button>
-
         <!-- Message Input -->
         <TextArea fx:id="messageInput"
                   promptText="Type a message..."
