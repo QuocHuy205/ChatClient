@@ -13,4 +13,5 @@ public interface IUserService extends Remote {
     List<UserDTO> searchUsers(String query) throws RemoteException;
     boolean updateProfile(Long userId, String displayName, String bio, String avatarUrl) throws RemoteException;
     boolean updateStatus(Long userId, UserStatus status) throws RemoteException;
+    String uploadAvatar(Long userId, byte[] imageData, String fileName) throws RemoteException;
 }

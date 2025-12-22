@@ -2,6 +2,7 @@ package vku.chatapp.client.model;
 
 import vku.chatapp.common.model.Message;
 import vku.chatapp.common.dto.UserDTO;
+import vku.chatapp.common.model.User;
 
 import java.util.ArrayList;
 import java.util.List;

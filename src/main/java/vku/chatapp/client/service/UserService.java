@@ -1,17 +1,18 @@
 package vku.chatapp.client.service;
 
 import vku.chatapp.client.rmi.RMIClient;
-import vku.chatapp.common.dto.AuthResponse;
-import vku.chatapp.common.dto.LoginRequest;
-import vku.chatapp.common.dto.RegisterRequest;
 import vku.chatapp.common.dto.UserDTO;
 import vku.chatapp.common.enums.UserStatus;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.rmi.RemoteException;
 import java.util.List;
 
 public class UserService {
     private final RMIClient rmiClient;
+
     public UserService() {
         this.rmiClient = RMIClient.getInstance();
     }
@@ -61,12 +62,36 @@ public class UserService {
         }
     }
 
+    /**
+     * Upload avatar image to server (which then uploads to Cloudinary)
+     * @param userId User ID
+     * @param localFilePath Path to local image file
+     * @return Cloudinary URL of uploaded avatar, or null if failed
+     */
+    public String uploadAvatar(Long userId, String localFilePath) {
+        try {
+            // Read file as byte array
+            Path path = Path.of(localFilePath);
+            byte[] imageData = Files.readAllBytes(path);
+            String fileName = path.getFileName().toString();
 
+            System.out.println("📤 Uploading avatar: " + fileName + " (" + imageData.length + " bytes)");
 
+            // Send to server via RMI
+            String cloudinaryUrl = rmiClient.getUserService().uploadAvatar(userId, imageData, fileName);
 
-//    UserDTO getUserById(Long userId) throws RemoteException;
-//    UserDTO getUserByUsername(String username) throws RemoteException;
-//    List<UserDTO> searchUsers(String query) throws RemoteException;
-//    boolean updateProfile(Long userId, String displayName, String bio, String avatarUrl) throws RemoteException;
-//    boolean updateStatus(Long userId, UserStatus status) throws RemoteException;
+            if (cloudinaryUrl != null) {
+                System.out.println("✅ Avatar uploaded successfully: " + cloudinaryUrl);
+            } else {
+                System.err.println("❌ Avatar upload failed");
+            }
+
+            return cloudinaryUrl;
+
+        } catch (IOException e) {
+            System.err.println("❌ Failed to read file: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
 }

@@ -32,16 +32,19 @@
     <!-- Avatar Section -->
     <VBox alignment="CENTER" spacing="15" styleClass="avatar-section">
         <StackPane>
-            <Circle radius="60" styleClass="avatar-circle-background"/>
-            <ImageView fx:id="avatarImageView"
-                       fitWidth="120"
-                       fitHeight="120"
-                       preserveRatio="true"
-                       styleClass="avatar-image">
-                <clip>
-                    <Circle radius="60"/>
-                </clip>
-            </ImageView>
+            <StackPane styleClass="avatar-container" >
+                <Circle fx:id="avatarBorder"
+                        radius="60"
+                        styleClass="avatar-border"/>
+
+                <ImageView fx:id="avatarImageView"
+                           fitWidth="120"
+                           fitHeight="120"
+                           preserveRatio="false"
+                           smooth="true"
+                           cache="true"/>
+            </StackPane>
+
             <Button fx:id="changeAvatarButton"
                     text="📷"
                     styleClass="change-avatar-button"
@@ -151,15 +154,7 @@
 
             <Separator/>
 
-            <!-- Status Section -->
-            <VBox spacing="10">
-                <Label text="Status" styleClass="section-title"/>
-                <HBox spacing="10" alignment="CENTER_LEFT">
-                    <Label text="Current Status:" styleClass="field-label"/>
-                    <ComboBox fx:id="statusComboBox"
-                              prefWidth="150"/>
-                </HBox>
-            </VBox>
+
         </VBox>
     </ScrollPane>
 

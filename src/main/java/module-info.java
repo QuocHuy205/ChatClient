@@ -8,5 +8,4 @@ module vku.chatapp {
     requires javafx.graphics;
     requires org.bytedeco.javacv;
 
-
 }

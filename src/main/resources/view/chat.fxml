@@ -16,7 +16,7 @@
         </padding>
 
         <!-- Avatar -->
-        <Region styleClass="avatar-circle" prefWidth="40" prefHeight="40"/>
+        <Region fx:id="avatarFriend" styleClass="avatar-circle" prefWidth="40" prefHeight="40"/>
 
         <!-- Friend Info -->
         <VBox spacing="2" HBox.hgrow="ALWAYS">

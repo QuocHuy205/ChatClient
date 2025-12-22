@@ -3,39 +3,40 @@
 
 package vku.chatapp.client.controller;
 
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.fxml.FXML;
-import javafx.fxml.FXMLLoader;
-import javafx.geometry.Insets;
-import javafx.geometry.Pos;
-import javafx.scene.Parent;
-import javafx.scene.Scene;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
-import javafx.scene.text.Font;
-import javafx.stage.Modality;
-import javafx.stage.Stage;
-import vku.chatapp.client.controller.component.ProfileEditorController;
-import vku.chatapp.client.model.CallSession;
-import vku.chatapp.client.model.UserSession;
-import vku.chatapp.client.p2p.P2PServer;
-import vku.chatapp.client.p2p.P2PMessageHandler;
-import vku.chatapp.client.p2p.PeerRegistry;
-import vku.chatapp.client.service.AuthService;
-import vku.chatapp.client.service.FriendService;
-import vku.chatapp.client.service.StatusUpdateService;
-import vku.chatapp.client.service.UserService;
-import vku.chatapp.common.dto.PeerInfo;
-import vku.chatapp.common.dto.UserDTO;
-import vku.chatapp.common.enums.CallType;
-import vku.chatapp.common.enums.UserStatus;
-import vku.chatapp.common.model.Friend;
-import vku.chatapp.common.model.User;
-import vku.chatapp.common.protocol.P2PMessage;
-import vku.chatapp.common.protocol.P2PMessageType;
-import vku.chatapp.client.rmi.RMIClient;
+    import javafx.application.Platform;
+    import javafx.collections.FXCollections;
+    import javafx.collections.ObservableList;
+    import javafx.fxml.FXML;
+    import javafx.fxml.FXMLLoader;
+    import javafx.geometry.Insets;
+    import javafx.geometry.Pos;
+    import javafx.scene.Parent;
+    import javafx.scene.Scene;
+    import javafx.scene.control.*;
+    import javafx.scene.image.Image;
+    import javafx.scene.layout.*;
+    import javafx.scene.text.Font;
+    import javafx.stage.Modality;
+    import javafx.stage.Stage;
+    import vku.chatapp.client.controller.component.ProfileEditorController;
+    import vku.chatapp.client.model.CallSession;
+    import vku.chatapp.client.model.UserSession;
+    import vku.chatapp.client.p2p.P2PServer;
+    import vku.chatapp.client.p2p.P2PMessageHandler;
+    import vku.chatapp.client.p2p.PeerRegistry;
+    import vku.chatapp.client.service.AuthService;
+    import vku.chatapp.client.service.FriendService;
+    import vku.chatapp.client.service.StatusUpdateService;
+    import vku.chatapp.client.service.UserService;
+    import vku.chatapp.common.dto.PeerInfo;
+    import vku.chatapp.common.dto.UserDTO;
+    import vku.chatapp.common.enums.CallType;
+    import vku.chatapp.common.enums.UserStatus;
+    import vku.chatapp.common.model.Friend;
+    import vku.chatapp.common.model.User;
+    import vku.chatapp.common.protocol.P2PMessage;
+    import vku.chatapp.common.protocol.P2PMessageType;
+    import vku.chatapp.client.rmi.RMIClient;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -46,17 +47,15 @@ import java.util.List;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+    import java.util.concurrent.*;
+    import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+    import java.util.concurrent.Executors;
 
 public class MainController extends BaseController {
     // User Profile Components
@@ -77,9 +76,10 @@ public class MainController extends BaseController {
     @FXML private VBox chatAreaContainer;
     @FXML private VBox sidebarContainer;
 
-    @FXML private Label requestBadgeLabel;
-    @FXML private VBox receivedRequestsBox;
-    @FXML private VBox sentRequestsBox;
+        @FXML private Label requestBadgeLabel;
+        @FXML private VBox receivedRequestsBox;
+        @FXML private VBox sentRequestsBox;
+        @FXML public Region avatarFriend;
 
     private P2PServer p2pServer;
     private P2PMessageHandler messageHandler;
@@ -91,6 +91,7 @@ public class MainController extends BaseController {
     private ObservableList<UserDTO> allFriends;
     private Timer heartbeatTimer;
     private StatusUpdateService statusUpdateService;
+    private User currentUser;
 
     private ScheduledExecutorService requestRefreshScheduler;
 
@@ -114,6 +115,7 @@ public class MainController extends BaseController {
 
         initializeP2PServer();
         registerPeerWithServer();
+        loadAvatar();
         loadFriendList();
         setupChatArea();
         setupMessageHandlers();
@@ -257,14 +259,13 @@ public class MainController extends BaseController {
                 } catch (Exception e) {
                     System.err.println("❌ Heartbeat failed → OFFLINE");
 
-                    cancel();
                 }
             }
         }, 0, 5000);
     }
 
 
-    private void startStatusPolling() {
+        private void startStatusPolling() {
         statusUpdateService.addListener(this::handleStatusUpdate);
         statusUpdateService.startPolling();
     }
@@ -593,9 +594,9 @@ public class MainController extends BaseController {
                     HBox header = new HBox(10);
                     header.setAlignment(Pos.CENTER_LEFT);
 
-                    Region avatar = new Region();
-                    avatar.setStyle("-fx-background-color: #0078d4; -fx-background-radius: 18;");
-                    avatar.setPrefSize(36, 36);
+                        Region avatar = new Region();
+                        avatar.setPrefSize(36, 36);
+                        loadAvatarFriend(avatar, sender.getAvatarUrl());
 
                     VBox userInfo = new VBox(1);
                     HBox.setHgrow(userInfo, Priority.ALWAYS);
@@ -616,163 +617,163 @@ public class MainController extends BaseController {
                         card.getChildren().add(timeLabel);
                     }
 
-                    // Actions
-                    HBox actions = new HBox(8);
-                    actions.setAlignment(Pos.CENTER_RIGHT);
+                        // Actions
+                        HBox actions = new HBox(8);
+                        actions.setAlignment(Pos.CENTER_RIGHT);
 
-                    Button acceptBtn = new Button("✓ Accept");
-                    acceptBtn.setStyle("-fx-background-color: #16c60c; -fx-text-fill: white; " +
-                            "-fx-font-size: 12px; -fx-padding: 6 16; -fx-cursor: hand; " +
-                            "-fx-background-radius: 4;");
-                    acceptBtn.setOnAction(e -> handleAcceptRequest(request.getId()));
+                        Button acceptBtn = new Button("✓ Accept");
+                        acceptBtn.setStyle("-fx-background-color: #16c60c; -fx-text-fill: white; " +
+                                "-fx-font-size: 12px; -fx-padding: 6 16; -fx-cursor: hand; " +
+                                "-fx-background-radius: 4;");
+                        acceptBtn.setOnAction(e -> handleAcceptRequest(request.getId()));
 
-                    Button rejectBtn = new Button("✗");
-                    rejectBtn.setStyle("-fx-background-color: #e1e1e1; -fx-text-fill: #666; " +
-                            "-fx-font-size: 12px; -fx-padding: 6 10; -fx-cursor: hand; " +
-                            "-fx-background-radius: 4;");
-                    rejectBtn.setOnAction(e -> handleRejectRequest(request.getId()));
+                        Button rejectBtn = new Button("✗");
+                        rejectBtn.setStyle("-fx-background-color: #e1e1e1; -fx-text-fill: #666; " +
+                                "-fx-font-size: 12px; -fx-padding: 6 10; -fx-cursor: hand; " +
+                                "-fx-background-radius: 4;");
+                        rejectBtn.setOnAction(e -> handleRejectRequest(request.getId()));
 
-                    actions.getChildren().addAll(rejectBtn, acceptBtn);
+                        actions.getChildren().addAll(rejectBtn, acceptBtn);
 
-                    card.getChildren().addAll(header, actions);
-                });
+                        card.getChildren().addAll(header, actions);
+                    });
 
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }).start();
 
-        return card;
-    }
+            return card;
+        }
 
-    private VBox createSentRequestCard(Friend request) {
-        VBox card = new VBox(8);
-        card.setStyle("-fx-background-color: white; -fx-padding: 12; -fx-background-radius: 6; " +
-                "-fx-border-color: #edebe9; -fx-border-radius: 6; -fx-border-width: 1;");
-        card.setMaxWidth(Double.MAX_VALUE);
-        VBox.setMargin(card, new Insets(0, 0, 8, 0));
+        private VBox createSentRequestCard(Friend request) {
+            VBox card = new VBox(8);
+            card.setStyle("-fx-background-color: white; -fx-padding: 12; -fx-background-radius: 6; " +
+                    "-fx-border-color: #edebe9; -fx-border-radius: 6; -fx-border-width: 1;");
+            card.setMaxWidth(Double.MAX_VALUE);
+            VBox.setMargin(card, new Insets(0, 0, 8, 0));
 
-        // Get receiver info via RMI
-        new Thread(() -> {
-            try {
-                UserDTO receiver = RMIClient.getInstance()
-                        .getUserService()
-                        .getUserById(request.getFriendId());
+            // Get receiver info via RMI
+            new Thread(() -> {
+                try {
+                    UserDTO receiver = RMIClient.getInstance()
+                            .getUserService()
+                            .getUserById(request.getFriendId());
 
-                if (receiver == null) return;
+                    if (receiver == null) return;
 
+                    Platform.runLater(() -> {
+                        HBox header = new HBox(10);
+                        header.setAlignment(Pos.CENTER_LEFT);
+
+                        Region avatar = new Region();
+                        avatar.setPrefSize(36, 36);
+                        loadAvatarFriend(avatar, receiver.getAvatarUrl());
+
+                        VBox userInfo = new VBox(1);
+                        HBox.setHgrow(userInfo, Priority.ALWAYS);
+
+                        Label nameLabel = new Label(receiver.getDisplayName());
+                        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+
+                        Label statusLabel = new Label("⏳ Pending");
+                        statusLabel.setStyle("-fx-text-fill: #ff8c00; -fx-font-size: 11px;");
+
+                        userInfo.getChildren().addAll(nameLabel, statusLabel);
+
+                        Button cancelBtn = new Button("Cancel");
+                        cancelBtn.setStyle("-fx-background-color: #e1e1e1; -fx-text-fill: #666; " +
+                                "-fx-font-size: 11px; -fx-padding: 6 12; -fx-cursor: hand; " +
+                                "-fx-background-radius: 4;");
+                        cancelBtn.setOnAction(e -> handleCancelRequest(request.getId()));
+
+                        header.getChildren().addAll(avatar, userInfo, cancelBtn);
+                        card.getChildren().add(header);
+                    });
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }).start();
+
+            return card;
+        }
+        private void handleAcceptRequest(Long requestId) {
+            new Thread(() -> {
+                boolean success = friendService.acceptFriendRequest(requestId);
                 Platform.runLater(() -> {
-                    HBox header = new HBox(10);
-                    header.setAlignment(Pos.CENTER_LEFT);
-
-                    Region avatar = new Region();
-                    avatar.setStyle("-fx-background-color: #0078d4; -fx-background-radius: 18;");
-                    avatar.setPrefSize(36, 36);
-
-                    VBox userInfo = new VBox(1);
-                    HBox.setHgrow(userInfo, Priority.ALWAYS);
-
-                    Label nameLabel = new Label(receiver.getDisplayName());
-                    nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
-
-                    Label statusLabel = new Label("⏳ Pending");
-                    statusLabel.setStyle("-fx-text-fill: #ff8c00; -fx-font-size: 11px;");
-
-                    userInfo.getChildren().addAll(nameLabel, statusLabel);
-
-                    Button cancelBtn = new Button("Cancel");
-                    cancelBtn.setStyle("-fx-background-color: #e1e1e1; -fx-text-fill: #666; " +
-                            "-fx-font-size: 11px; -fx-padding: 6 12; -fx-cursor: hand; " +
-                            "-fx-background-radius: 4;");
-                    cancelBtn.setOnAction(e -> handleCancelRequest(request.getId()));
-
-                    header.getChildren().addAll(avatar, userInfo, cancelBtn);
-                    card.getChildren().add(header);
+                    if (success) {
+                        showInfo("Success", "Friend request accepted!");
+                        loadFriendRequests();
+                        loadFriendList();
+                    } else {
+                        showError("Error", "Failed to accept request");
+                    }
                 });
+            }).start();
+        }
 
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
+        private void handleRejectRequest(Long requestId) {
+            new Thread(() -> {
+                boolean success = friendService.rejectFriendRequest(requestId);
+                Platform.runLater(() -> {
+                    if (success) {
+                        loadFriendRequests();
+                    } else {
+                        showError("Error", "Failed to reject request");
+                    }
+                });
+            }).start();
+        }
 
-        return card;
-    }
-    private void handleAcceptRequest(Long requestId) {
-        new Thread(() -> {
-            boolean success = friendService.acceptFriendRequest(requestId);
-            Platform.runLater(() -> {
-                if (success) {
-                    showInfo("Success", "Friend request accepted!");
-                    loadFriendRequests();
-                    loadFriendList();
-                } else {
-                    showError("Error", "Failed to accept request");
-                }
-            });
-        }).start();
-    }
+        private void handleCancelRequest(Long requestId) {
+            new Thread(() -> {
+                Long currentUserId = UserSession.getInstance().getCurrentUser().getId();
+                boolean success = friendService.cancelFriendRequest(requestId, currentUserId);
+                Platform.runLater(() -> {
+                    if (success) {
+                        loadFriendRequests();
+                    } else {
+                        showError("Error", "Failed to cancel request");
+                    }
+                });
+            }).start();
+        }
 
-    private void handleRejectRequest(Long requestId) {
-        new Thread(() -> {
-            boolean success = friendService.rejectFriendRequest(requestId);
-            Platform.runLater(() -> {
-                if (success) {
-                    loadFriendRequests();
-                } else {
-                    showError("Error", "Failed to reject request");
-                }
-            });
-        }).start();
-    }
+        private String formatTimeAgo(LocalDateTime dateTime) {
+            LocalDateTime now = LocalDateTime.now();
+            long minutes = ChronoUnit.MINUTES.between(dateTime, now);
 
-    private void handleCancelRequest(Long requestId) {
-        new Thread(() -> {
-            Long currentUserId = UserSession.getInstance().getCurrentUser().getId();
-            boolean success = friendService.cancelFriendRequest(requestId, currentUserId);
-            Platform.runLater(() -> {
-                if (success) {
-                    loadFriendRequests();
-                } else {
-                    showError("Error", "Failed to cancel request");
-                }
-            });
-        }).start();
-    }
+            if (minutes < 1) return "Just now";
+            if (minutes < 60) return minutes + " min ago";
 
-    private String formatTimeAgo(LocalDateTime dateTime) {
-        LocalDateTime now = LocalDateTime.now();
-        long minutes = ChronoUnit.MINUTES.between(dateTime, now);
+            long hours = ChronoUnit.HOURS.between(dateTime, now);
+            if (hours < 24) return hours + " hour" + (hours > 1 ? "s" : "") + " ago";
 
-        if (minutes < 1) return "Just now";
-        if (minutes < 60) return minutes + " min ago";
+            long days = ChronoUnit.DAYS.between(dateTime, now);
+            if (days < 7) return days + " day" + (days > 1 ? "s" : "") + " ago";
 
-        long hours = ChronoUnit.HOURS.between(dateTime, now);
-        if (hours < 24) return hours + " hour" + (hours > 1 ? "s" : "") + " ago";
-
-        long days = ChronoUnit.DAYS.between(dateTime, now);
-        if (days < 7) return days + " day" + (days > 1 ? "s" : "") + " ago";
-
-        return dateTime.format(DateTimeFormatter.ofPattern("MMM dd"));
-    }
+            return dateTime.format(DateTimeFormatter.ofPattern("MMM dd"));
+        }
 
 
-    private VBox createEmptyState(String emoji, String title, String subtitle) {
-        VBox emptyState = new VBox(10);
-        emptyState.setAlignment(Pos.CENTER);
-        emptyState.setPadding(new Insets(40, 20, 40, 20));
+        private VBox createEmptyState(String emoji, String title, String subtitle) {
+            VBox emptyState = new VBox(10);
+            emptyState.setAlignment(Pos.CENTER);
+            emptyState.setPadding(new Insets(40, 20, 40, 20));
 
-        Label emojiLabel = new Label(emoji);
-        emojiLabel.setFont(new Font(36));
+            Label emojiLabel = new Label(emoji);
+            emojiLabel.setFont(new Font(36));
 
-        Label titleLabel = new Label(title);
-        titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #333;");
+            Label titleLabel = new Label(title);
+            titleLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #333;");
 
-        Label subtitleLabel = new Label(subtitle);
-        subtitleLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #666;");
+            Label subtitleLabel = new Label(subtitle);
+            subtitleLabel.setStyle("-fx-font-size: 12px; -fx-text-fill: #666;");
 
-        emptyState.getChildren().addAll(emojiLabel, titleLabel, subtitleLabel);
-        return emptyState;
-    }
+            emptyState.getChildren().addAll(emojiLabel, titleLabel, subtitleLabel);
+            return emptyState;
+        }
 
     private void handleIncomingMessage(P2PMessage message) {
         Platform.runLater(() -> {
@@ -905,49 +906,49 @@ public class MainController extends BaseController {
         });
     }
 
-    private void handlerProfile() {
-        try {
-            FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/profile_editor.fxml"));
-            VBox profileView = loader.load();
-
-            ProfileEditorController profileController = loader.getController();
-
-            // Tạo Stage mới cho Profile Editor
-            Stage profileStage = new Stage();
-            profileController.setStage(profileStage);
-
-            Scene scene = new Scene(profileView);
-
-            // Load CSS nếu có
+        private void handlerProfile() {
             try {
-                scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
-            } catch (Exception e) {
-                System.err.println("⚠️ CSS file not found, using default styles");
-            }
+                FXMLLoader loader = new FXMLLoader(getClass().getResource("/view/profile_editor.fxml"));
+                VBox profileView = loader.load();
 
-            profileStage.setTitle("Edit Profile");
-            profileStage.setScene(scene);
-            profileStage.initModality(Modality.APPLICATION_MODAL);
-            profileStage.setResizable(false);
+                ProfileEditorController profileController = loader.getController();
 
-            // Callback khi đóng profile editor để refresh UI
-            profileStage.setOnHidden(e -> {
-                // Refresh user info on main screen
-                User updatedUser = UserSession.getInstance().getCurrentUser();
-                if (updatedUser != null) {
-                    usernameLabel.setText(updatedUser.getDisplayName());
-                    statusLabel.setText(updatedUser.getStatus().toString());
+                // Tạo Stage mới cho Profile Editor
+                Stage profileStage = new Stage();
+                profileController.setStage(profileStage);
+
+                Scene scene = new Scene(profileView);
+
+                // Load CSS nếu có
+                try {
+                    scene.getStylesheets().add(getClass().getResource("/css/styles.css").toExternalForm());
+                } catch (Exception e) {
+                    System.err.println("⚠️ CSS file not found, using default styles");
                 }
-            });
 
-            profileStage.show();
+                profileStage.setTitle("Edit Profile");
+                profileStage.setScene(scene);
+                profileStage.initModality(Modality.APPLICATION_MODAL);
+                profileStage.setResizable(false);
 
-        } catch (Exception e) {
-            System.err.println("❌ Error opening profile editor: " + e.getMessage());
-            e.printStackTrace();
-            showError("Error", "Failed to open profile editor: " + e.getMessage());
+                // Callback khi đóng profile editor để refresh UI
+                profileStage.setOnHidden(e -> {
+                    // Refresh user info on main screen
+                    User updatedUser = UserSession.getInstance().getCurrentUser();
+                    if (updatedUser != null) {
+                        usernameLabel.setText(updatedUser.getDisplayName());
+                        statusLabel.setText(updatedUser.getStatus().toString());
+                    }
+                });
+
+                profileStage.show();
+
+            } catch (Exception e) {
+                System.err.println("❌ Error opening profile editor: " + e.getMessage());
+                e.printStackTrace();
+                showError("Error", "Failed to open profile editor: " + e.getMessage());
+            }
         }
-    }
 
 
 
@@ -1085,4 +1086,109 @@ public class MainController extends BaseController {
         }
     }
 
-}
+        // load avatar image
+        // Set avatar
+        private void loadAvatar() {
+            currentUser = UserSession.getInstance().getCurrentUser();
+            String avatarUrl = currentUser.getAvatarUrl();
+            if (avatarUrl == null || avatarUrl.isEmpty()) {
+                loadDefaultAvatar();
+                return;
+            }
+
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Image image;
+
+                    if (avatarUrl.startsWith("http")) {
+                        image = new Image(avatarUrl, true);
+                    } else {
+                        File file = new File(avatarUrl);
+                        image = file.exists()
+                                ? new Image(file.toURI().toString())
+                                : new Image(getClass().getResourceAsStream(avatarUrl));
+                    }
+
+                    Platform.runLater(() -> {
+                        if (image.isError()) {
+                            loadDefaultAvatar();
+                        } else {
+                            setRegionBackgroundImage(avatarFriend, image);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    Platform.runLater(this::loadDefaultAvatar);
+                }
+            });
+        }
+
+        // Set avatar
+        private void loadAvatarFriend(Region avatarRegion, String avatarUrl) {
+            if (avatarUrl == null || avatarUrl.isEmpty()) {
+                setDefaultAvatarfr(avatarRegion);
+                return;
+            }
+
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Image image;
+
+                    if (avatarUrl.startsWith("http")) {
+                        image = new Image(avatarUrl, true);
+                    } else {
+                        File file = new File(avatarUrl);
+                        image = file.exists()
+                                ? new Image(file.toURI().toString())
+                                : new Image(getClass().getResourceAsStream(avatarUrl));
+                    }
+
+                    Platform.runLater(() -> {
+                        if (image.isError()) {
+                            setDefaultAvatarfr(avatarRegion);
+                        } else {
+                            setRegionBackgroundImage(avatarRegion, image);
+                        }
+                    });
+
+                } catch (Exception e) {
+                    Platform.runLater(() -> setDefaultAvatarfr(avatarRegion));
+                }
+            });
+        }
+
+
+
+        private void setRegionBackgroundImage(Region region, Image image) {
+            BackgroundSize backgroundSize = new BackgroundSize(
+                    40, 40, true, true, true, false
+            );
+
+            BackgroundImage backgroundImage = new BackgroundImage(
+                    image,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundRepeat.NO_REPEAT,
+                    BackgroundPosition.CENTER,
+                    backgroundSize
+            );
+
+            region.setBackground(new Background(backgroundImage));
+        }
+        private void setDefaultAvatarfr(Region region) {
+            region.setStyle(
+                    "-fx-background-color: #cbd5e1;" +
+                            "-fx-background-radius: 50%;"
+            );
+        }
+
+
+
+        private void loadDefaultAvatar() {
+            avatarFriend.setStyle(
+                    "-fx-background-color: #3498db;" +
+                            "-fx-background-radius: 50%;"
+            );
+        }
+
+
+    }

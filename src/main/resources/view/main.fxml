@@ -19,7 +19,7 @@
                     <Insets top="15" right="15" bottom="15" left="15"/>
                 </padding>
 
-                <Region styleClass="avatar-circle" prefWidth="45" prefHeight="45"/>
+                <Region fx:id="avatarFriend" styleClass="avatar-circle" prefWidth="45" prefHeight="45"/>
 
                 <VBox spacing="2" HBox.hgrow="ALWAYS">
                     <Label fx:id="usernameLabel" text="User Name" styleClass="username-label">
@@ -124,7 +124,6 @@
                 <Tab text="Requests">
                     <graphic>
                         <HBox spacing="5" alignment="CENTER_LEFT">
-                            <Label text="Requests"/>
                             <Label fx:id="requestBadgeLabel" text="0"
                                    styleClass="badge-label"
                                    visible="false" managed="false"/>
@@ -159,23 +158,6 @@
 
                         </TabPane>
                     </VBox>
-                </Tab>
-
-                <!-- Chats Tab -->
-                <Tab text="Chats">
-                    <ListView fx:id="chatListView" styleClass="chat-list">
-                        <placeholder>
-                            <VBox alignment="CENTER" spacing="10">
-                                <padding>
-                                    <Insets top="30"/>
-                                </padding>
-                                <Label text="💬" style="-fx-font-size: 32px;"/>
-                                <Label text="No conversations yet" styleClass="placeholder-label"/>
-                                <Label text="Select a friend to start chatting"
-                                       style="-fx-font-size: 11px; -fx-text-fill: #605e5c;"/>
-                            </VBox>
-                        </placeholder>
-                    </ListView>
                 </Tab>
 
             </TabPane>

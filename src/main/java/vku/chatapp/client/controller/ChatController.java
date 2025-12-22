@@ -33,6 +33,7 @@ import vku.chatapp.common.enums.CallType;
 import vku.chatapp.common.enums.MessageStatus;
 import vku.chatapp.common.enums.MessageType;
 import vku.chatapp.common.model.Message;
+import vku.chatapp.common.model.User;
 import vku.chatapp.common.protocol.P2PMessage;
 import vku.chatapp.common.protocol.P2PMessageType;
 
@@ -45,6 +46,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ChatController extends BaseController {
@@ -58,6 +60,7 @@ public class ChatController extends BaseController {
     @FXML private Button videoCallButton; // ✅ NEW
     @FXML private Label chatTitleLabel;
     @FXML private Label chatStatusLabel;
+    @FXML public Region avatarFriend;
 
     private MessageService messageService;
     private FileTransferService fileTransferService;
@@ -142,6 +145,9 @@ public class ChatController extends BaseController {
                 });
             }
         }).start();
+        if (friend.getAvatarUrl() != null && !friend.getAvatarUrl().isEmpty()) {
+            loadAvatar(friend.getAvatarUrl());
+        }
 
         // ✅ Enable call buttons
         if (audioCallButton != null) audioCallButton.setDisable(false);
@@ -383,6 +389,8 @@ public class ChatController extends BaseController {
                 if (messageType == MessageType.IMAGE) {
                     fileTransferService.cacheImage(file);
                 }
+
+
                 Message savedMessage = RMIClient.getInstance()
                         .getMessageService()
                         .saveMessage(message);
@@ -408,6 +416,9 @@ public class ChatController extends BaseController {
                     displayMessage(savedMessage, false);
 
                     if (!success) {
+//                        showInfo(messageType + " Sent",
+//                                messageType + " sent successfully: " + file.getName());
+//                    } else {
                         showError("Send Failed",
                                 "Could not send " + messageType.toString().toLowerCase() + ". Message saved to database.");
                     }
@@ -843,6 +854,9 @@ public class ChatController extends BaseController {
         }
     }
 
+    /**
+     * ✅ Get file icon based on extension
+     */
     private String getFileIcon(String fileName) {
         if (fileName == null) return "📎";
 
@@ -890,5 +904,62 @@ public class ChatController extends BaseController {
             }
         }
     }
+    // Set avatar
+    private void loadAvatar(String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isEmpty()) {
+            loadDefaultAvatar();
+            return;
+        }
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                Image image;
+
+                if (avatarUrl.startsWith("http")) {
+                    image = new Image(avatarUrl, true);
+                } else {
+                    File file = new File(avatarUrl);
+                    image = file.exists()
+                            ? new Image(file.toURI().toString())
+                            : new Image(getClass().getResourceAsStream(avatarUrl));
+                }
+
+                Platform.runLater(() -> {
+                    if (image.isError()) {
+                        loadDefaultAvatar();
+                    } else {
+                        setRegionBackgroundImage(avatarFriend, image);
+                    }
+                });
+
+            } catch (Exception e) {
+                Platform.runLater(this::loadDefaultAvatar);
+            }
+        });
+    }
+
+    private void setRegionBackgroundImage(Region region, Image image) {
+        BackgroundSize backgroundSize = new BackgroundSize(
+                40, 40, true, true, true, false
+        );
+
+        BackgroundImage backgroundImage = new BackgroundImage(
+                image,
+                BackgroundRepeat.NO_REPEAT,
+                BackgroundRepeat.NO_REPEAT,
+                BackgroundPosition.CENTER,
+                backgroundSize
+        );
+
+        region.setBackground(new Background(backgroundImage));
+    }
+
+    private void loadDefaultAvatar() {
+        avatarFriend.setStyle(
+                "-fx-background-color: #3498db;" +
+                        "-fx-background-radius: 50%;"
+        );
+    }
+
 
 }

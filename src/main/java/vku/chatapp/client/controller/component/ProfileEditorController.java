@@ -2,11 +2,15 @@ package vku.chatapp.client.controller.component;
 
 import javafx.application.Platform;
 import javafx.fxml.FXML;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import vku.chatapp.client.controller.BaseController;
@@ -17,11 +21,6 @@ import vku.chatapp.client.service.UserService;
 import vku.chatapp.common.model.User;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.Paths;
 import java.util.concurrent.CompletableFuture;
 
 public class ProfileEditorController extends BaseController {
@@ -30,6 +29,7 @@ public class ProfileEditorController extends BaseController {
     @FXML private ImageView avatarImageView;
     @FXML private Button changeAvatarButton;
     @FXML private Label avatarSizeLabel;
+    @FXML private Circle avatarBorder;
 
     @FXML private TextField usernameField;
     @FXML private TextField fullNameField;
@@ -46,7 +46,6 @@ public class ProfileEditorController extends BaseController {
     @FXML private PasswordField confirmPasswordField;
     @FXML private Label passwordErrorLabel;
 
-    @FXML private ComboBox<UserStatus> statusComboBox;
 
     @FXML private Button saveButton;
     @FXML private Button cancelButton;
@@ -56,10 +55,8 @@ public class ProfileEditorController extends BaseController {
     private final UserService userService;
     private User currentUser;
     private String newAvatarUrl;
+    private String newAvatarLocalPath;  // Local path for preview
     private boolean avatarChanged = false;
-
-    // Thư mục lưu avatar (có thể cấu hình)
-    private static final String AVATAR_DIRECTORY = "avatars/";
 
     public ProfileEditorController() {
         this.userService = new UserService();
@@ -67,63 +64,17 @@ public class ProfileEditorController extends BaseController {
 
     @FXML
     public void initialize() {
-        setupStatusComboBox();
+        setupAvatarClip();
         setupEventHandlers();
         setupValidation();
         setupRealtimeValidation();
         loadUserProfile();
-
-        // Tạo thư mục avatars nếu chưa có
-        createAvatarDirectory();
     }
 
-    // Thêm setter cho stage
     public void setStage(Stage stage) {
         this.stage = stage;
     }
 
-    private void createAvatarDirectory() {
-        try {
-            Files.createDirectories(Paths.get(AVATAR_DIRECTORY));
-        } catch (IOException e) {
-            System.err.println("Failed to create avatar directory: " + e.getMessage());
-        }
-    }
-
-    private void setupStatusComboBox() {
-        statusComboBox.getItems().addAll(
-                UserStatus.ONLINE,
-                UserStatus.AWAY,
-                UserStatus.BUSY,
-                UserStatus.OFFLINE
-        );
-
-        // Custom cell factory to display status with icons
-        statusComboBox.setCellFactory(param -> new ListCell<UserStatus>() {
-            @Override
-            protected void updateItem(UserStatus status, boolean empty) {
-                super.updateItem(status, empty);
-                if (empty || status == null) {
-                    setText(null);
-                } else {
-                    setText(getStatusText(status));
-                    setStyle(getStatusStyle(status));
-                }
-            }
-        });
-
-        statusComboBox.setButtonCell(new ListCell<UserStatus>() {
-            @Override
-            protected void updateItem(UserStatus status, boolean empty) {
-                super.updateItem(status, empty);
-                if (empty || status == null) {
-                    setText(null);
-                } else {
-                    setText(getStatusText(status));
-                }
-            }
-        });
-    }
 
     private void setupEventHandlers() {
         backButton.setOnAction(e -> handleBack());
@@ -150,7 +101,6 @@ public class ProfileEditorController extends BaseController {
     }
 
     private void setupValidation() {
-        // Email validation
         emailField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null && !newVal.isEmpty() && !isValidEmail(newVal)) {
                 emailErrorLabel.setText("Invalid email format");
@@ -162,7 +112,6 @@ public class ProfileEditorController extends BaseController {
             }
         });
 
-        // Password validation
         newPasswordField.textProperty().addListener((obs, oldVal, newVal) -> {
             validatePasswordFields();
         });
@@ -180,7 +129,6 @@ public class ProfileEditorController extends BaseController {
             fullNameField.setText(currentUser.getDisplayName() != null ? currentUser.getDisplayName() : "");
             emailField.setText(currentUser.getEmail() != null ? currentUser.getEmail() : "");
             bioField.setText(currentUser.getBio() != null ? currentUser.getBio() : "");
-            statusComboBox.setValue(currentUser.getStatus());
 
             if (currentUser.getAvatarUrl() != null && !currentUser.getAvatarUrl().isEmpty()) {
                 loadAvatar(currentUser.getAvatarUrl());
@@ -190,24 +138,23 @@ public class ProfileEditorController extends BaseController {
         }
     }
 
-
     private void loadDefaultAvatar() {
         try {
-            Image defaultImage = new Image(getClass().getResourceAsStream("/images/default-avatar.png"));
+            // Tạo một vùng chứa hình vuông với màu nền bạn muốn
+            Region colorRegion = new Region();
+            colorRegion.setPrefSize(120, 120); // Kích thước bằng với ImageView của bạn
+            colorRegion.setStyle("-fx-background-color: #3498db; -fx-background-radius: 50;"); // Màu xanh, bo tròn
+
+            // Chụp ảnh vùng màu đó và set vào ImageView
+            SnapshotParameters sp = new SnapshotParameters();
+            sp.setFill(Color.TRANSPARENT);
+            Image defaultImage = colorRegion.snapshot(sp, null);
+
             avatarImageView.setImage(defaultImage);
         } catch (Exception e) {
-            System.err.println("Error loading default avatar: " + e.getMessage());
+            System.err.println("Error setting color avatar: " + e.getMessage());
         }
     }
-
-    private String getFileExtension(String fileName) {
-        int lastIndexOf = fileName.lastIndexOf(".");
-        if (lastIndexOf == -1) {
-            return ""; // empty extension
-        }
-        return fileName.substring(lastIndexOf);
-    }
-
 
     private boolean validateForm() {
         StringBuilder errors = new StringBuilder();
@@ -238,7 +185,7 @@ public class ProfileEditorController extends BaseController {
         }
 
         if (errors.length() > 0) {
-            showError("error", errors.toString());
+            showError("Error", errors.toString());
             return false;
         }
 
@@ -279,7 +226,6 @@ public class ProfileEditorController extends BaseController {
         passwordErrorLabel.setManaged(false);
     }
 
-
     private void showLoading(boolean show) {
         loadingOverlay.setVisible(show);
         loadingOverlay.setManaged(show);
@@ -291,26 +237,6 @@ public class ProfileEditorController extends BaseController {
         return email.matches("^[A-Za-z0-9+_.-]+@(.+)$");
     }
 
-    private String getStatusText(UserStatus status) {
-        return switch (status) {
-            case ONLINE -> "🟢 Online";
-            case AWAY -> "🟡 Away";
-            case BUSY -> "🔴 Busy";
-            case OFFLINE -> "⚫ Offline";
-            default -> status.name();
-        };
-    }
-
-    private String getStatusStyle(UserStatus status) {
-        return switch (status) {
-            case ONLINE -> "-fx-text-fill: #4CAF50;";
-            case AWAY -> "-fx-text-fill: #FFC107;";
-            case BUSY -> "-fx-text-fill: #F44336;";
-            case OFFLINE -> "-fx-text-fill: #9E9E9E;";
-            default -> "";
-        };
-    }
-
     private void handleSaveProfile() {
         if (!validateForm()) {
             return;
@@ -320,11 +246,30 @@ public class ProfileEditorController extends BaseController {
 
         CompletableFuture.runAsync(() -> {
             try {
-                // Cập nhật thông tin cơ bản
+                String avatarUrl = currentUser.getAvatarUrl();
+
+                // Upload avatar if changed
+                if (avatarChanged && newAvatarLocalPath != null) {
+                    System.out.println("📤 Uploading new avatar...");
+                    avatarSizeLabel.setText("Uploading to Google Drive...");
+
+                    String uploadedUrl = userService.uploadAvatar(currentUser.getId(), newAvatarLocalPath);
+
+                    if (uploadedUrl != null) {
+                        avatarUrl = uploadedUrl;
+                        System.out.println("✅ Avatar uploaded: " + uploadedUrl);
+                    } else {
+                        Platform.runLater(() -> {
+                            showLoading(false);
+                            showError("Upload Failed", "Failed to upload avatar to Google Drive");
+                        });
+                        return;
+                    }
+                }
+
+                // Update profile
                 String displayName = fullNameField.getText().trim();
-                String email = emailField.getText().trim();
                 String bio = bioField.getText().trim();
-                String avatarUrl = avatarChanged ? newAvatarUrl : currentUser.getAvatarUrl();
 
                 boolean profileUpdated = userService.updateProfile(
                         currentUser.getId(),
@@ -341,43 +286,22 @@ public class ProfileEditorController extends BaseController {
                     return;
                 }
 
-                // Cập nhật status nếu thay đổi
-                UserStatus newStatus = statusComboBox.getValue();
-                if (newStatus != null && newStatus != currentUser.getStatus()) {
-                    boolean statusUpdated = userService.updateStatus(currentUser.getId(), newStatus);
-                    if (statusUpdated) {
-                        System.out.println("✅ Status updated to: " + newStatus);
-                    }
-                }
-
-                // Xử lý đổi mật khẩu nếu có
+                // Handle password change
                 if (changePasswordCheckbox.isSelected()) {
-                    String currentPassword = currentPasswordField.getText();
-                    String newPassword = newPasswordField.getText();
-
-                    // TODO: Implement password change when server API is ready
-                    // boolean passwordChanged = authService.changePassword(
-                    //     currentUser.getId(),
-                    //     currentPassword,
-                    //     newPassword
-                    // );
-
                     Platform.runLater(() -> {
                         showInfo("Coming Soon", "Password change feature will be available soon");
                     });
                 }
 
-                // Reload user data from server
+                // Reload user data
                 UserDTO updatedUser = userService.getUserById(currentUser.getId());
                 if (updatedUser != null) {
-                    // Cập nhật session với thông tin mới
                     User sessionUser = UserSession.getInstance().getCurrentUser();
                     sessionUser.setDisplayName(updatedUser.getDisplayName());
                     sessionUser.setBio(updatedUser.getBio());
                     sessionUser.setAvatarUrl(updatedUser.getAvatarUrl());
                     sessionUser.setEmail(updatedUser.getEmail());
                     sessionUser.setStatus(updatedUser.getStatus());
-
                     currentUser = sessionUser;
                 }
 
@@ -388,7 +312,6 @@ public class ProfileEditorController extends BaseController {
                     avatarSizeLabel.setText("Click to upload photo (max 5MB)");
                     avatarSizeLabel.setStyle("");
 
-                    // Đóng dialog sau 1.5 giây
                     new Thread(() -> {
                         try {
                             Thread.sleep(1500);
@@ -409,9 +332,7 @@ public class ProfileEditorController extends BaseController {
         });
     }
 
-    // Cải thiện handleBack
     private void handleBack() {
-        // Kiểm tra nếu có thay đổi chưa lưu
         if (hasUnsavedChanges()) {
             Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
             confirmAlert.setTitle("Unsaved Changes");
@@ -441,7 +362,6 @@ public class ProfileEditorController extends BaseController {
         }
     }
 
-    // Kiểm tra có thay đổi chưa lưu không
     private boolean hasUnsavedChanges() {
         if (currentUser == null) return false;
 
@@ -457,12 +377,9 @@ public class ProfileEditorController extends BaseController {
                 currentUser.getBio() != null ? currentUser.getBio() : ""
         );
 
-        boolean statusChanged = statusComboBox.getValue() != currentUser.getStatus();
-
-        return displayNameChanged || emailChanged || bioChanged || statusChanged || avatarChanged;
+        return displayNameChanged || emailChanged || bioChanged || avatarChanged;
     }
 
-    // Cải thiện loadAvatar với xử lý lỗi tốt hơn
     private void loadAvatar(String avatarUrl) {
         if (avatarUrl == null || avatarUrl.isEmpty()) {
             loadDefaultAvatar();
@@ -472,17 +389,18 @@ public class ProfileEditorController extends BaseController {
         CompletableFuture.runAsync(() -> {
             try {
                 Image image;
-                File avatarFile = new File(avatarUrl);
 
-                // Kiểm tra nếu là đường dẫn local
-                if (avatarFile.exists()) {
-                    image = new Image(avatarFile.toURI().toString());
-                } else if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
-                    // Nếu là URL
-                    image = new Image(avatarUrl, true); // true = load in background
+                // Check if it's a URL (Cloudinary, Google Drive, or any online source)
+                if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
+                    image = new Image(avatarUrl, true); // true = background loading
                 } else {
-                    // Thử load từ resources
-                    image = new Image(getClass().getResourceAsStream(avatarUrl));
+                    // Try loading from local file or resources
+                    File avatarFile = new File(avatarUrl);
+                    if (avatarFile.exists()) {
+                        image = new Image(avatarFile.toURI().toString());
+                    } else {
+                        image = new Image(getClass().getResourceAsStream(avatarUrl));
+                    }
                 }
 
                 Platform.runLater(() -> {
@@ -491,6 +409,7 @@ public class ProfileEditorController extends BaseController {
                         loadDefaultAvatar();
                     } else {
                         avatarImageView.setImage(image);
+                        System.out.println("✅ Avatar loaded successfully");
                     }
                 });
 
@@ -501,13 +420,13 @@ public class ProfileEditorController extends BaseController {
         });
     }
 
-    // Thêm validation realtime cho email
+
     private void setupRealtimeValidation() {
         emailField.focusedProperty().addListener((obs, wasFocused, isNowFocused) -> {
-            if (!isNowFocused) { // Lost focus
+            if (!isNowFocused) {
                 String email = emailField.getText().trim();
                 if (!email.isEmpty() && !isValidEmail(email)) {
-                    emailErrorLabel.setText("❌ Invalid email format");
+                    emailErrorLabel.setText("⚠ Invalid email format");
                     emailErrorLabel.setVisible(true);
                     emailErrorLabel.setManaged(true);
                     emailField.setStyle("-fx-border-color: red;");
@@ -519,7 +438,6 @@ public class ProfileEditorController extends BaseController {
             }
         });
 
-        // Clear error when user starts typing
         emailField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (emailErrorLabel.isVisible()) {
                 emailField.setStyle("");
@@ -527,7 +445,6 @@ public class ProfileEditorController extends BaseController {
         });
     }
 
-    // Cải thiện handleChangeAvatar với preview tốt hơn
     private void handleChangeAvatar() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Select Profile Picture");
@@ -541,7 +458,7 @@ public class ProfileEditorController extends BaseController {
 
         if (selectedFile != null) {
             try {
-                // Kiểm tra kích thước file (max 5MB)
+                // Check file size (max 5MB)
                 long fileSizeInBytes = selectedFile.length();
                 long fileSizeInMB = fileSizeInBytes / (1024 * 1024);
 
@@ -551,40 +468,44 @@ public class ProfileEditorController extends BaseController {
                     return;
                 }
 
-                // Kiểm tra xem có phải file ảnh hợp lệ không
+                // Validate image
                 Image testImage = new Image(selectedFile.toURI().toString());
                 if (testImage.isError()) {
                     showError("Invalid Image", "Selected file is not a valid image");
                     return;
                 }
 
-                // Copy file to avatars directory with unique name
-                String fileExtension = getFileExtension(selectedFile.getName());
-                String newFileName = "avatar_" + currentUser.getId() + "_" +
-                        System.currentTimeMillis() + fileExtension;
-                String newFilePath = AVATAR_DIRECTORY + newFileName;
-
-                // Tạo thư mục nếu chưa có
-                Files.createDirectories(Paths.get(AVATAR_DIRECTORY));
-
-                Files.copy(selectedFile.toPath(), Paths.get(newFilePath),
-                        StandardCopyOption.REPLACE_EXISTING);
-
-                newAvatarUrl = newFilePath;
+                // Save local path for upload later
+                newAvatarLocalPath = selectedFile.getAbsolutePath();
                 avatarChanged = true;
 
                 // Display preview
-                loadAvatar(newFilePath);
+                loadAvatar(selectedFile.toURI().toString());
 
-                avatarSizeLabel.setText("✅ Avatar changed (not saved yet)");
+                avatarSizeLabel.setText("✅ Avatar changed (will be uploaded on save)");
                 avatarSizeLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
 
-                System.out.println("✅ Avatar preview loaded: " + newFilePath);
+                System.out.println("✅ Avatar preview loaded: " + newAvatarLocalPath);
 
-            } catch (IOException e) {
+            } catch (Exception e) {
                 showError("Error", "Failed to load image: " + e.getMessage());
                 e.printStackTrace();
             }
         }
     }
+    private void setupAvatarClip() {
+        Circle clip = new Circle();
+
+        // Tâm hình tròn
+        clip.centerXProperty().bind(avatarImageView.fitWidthProperty().divide(2));
+        clip.centerYProperty().bind(avatarImageView.fitHeightProperty().divide(2));
+
+        // Bán kính
+        clip.radiusProperty().bind(
+                avatarImageView.fitWidthProperty().divide(2)
+        );
+
+        avatarImageView.setClip(clip);
+    }
+
 }
